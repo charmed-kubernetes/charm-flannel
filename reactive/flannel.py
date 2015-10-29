@@ -1,5 +1,3 @@
-import os
-
 from shlex import split
 from subprocess import check_call
 
@@ -7,16 +5,19 @@ from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
 
-from charmhelpers.core import hookenv
 from charmhelpers.core.hookenv import status_set
 
-from os import getenv
-import sys
+
+# Network Port Map
+# protocol | port | source       | purpose
+# ----------------------------------------------------------------------
+# UDP     | 8285  | worker nodes | Flannel overlay network - UDP Backend.
+# UDP     | 8472  | worker nodes | Flannel overlay network - vxlan backend
 
 @when('docker.ready')
 @when_not('etcd.connected')
 def halt_execution():
-    hookenv.status_set('blocked', 'Pending Etcd relation.')
+    status_set('blocked', 'Pending etcd relation.')
 
 @when('docker.ready', 'etcd.available')
 def run_bootstrap_daemons(etcd):
