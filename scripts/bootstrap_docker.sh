@@ -24,6 +24,9 @@ if [ -f /var/run/docker-bootstrap.pid ]; then
   exit 0
 fi
 
+status-set maintenance "Installing Flannel networking"
+
+
 # Cross Platform and does not survive reboots. :cheers:
 
 docker -d -H unix:///var/run/docker-bootstrap.sock \

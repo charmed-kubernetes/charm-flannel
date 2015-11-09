@@ -34,7 +34,6 @@ def run_bootstrap_daemons(etcd):
         a running Docker daemon started by systemd/upstart. Not to be run after
         initial job completion'''
 
-    status_set('maintenance', "Installing Flannel networking")
     cmd = "scripts/bootstrap_docker.sh {}".format(etcd.connection_string())
     check_call(split(cmd))
     ingest_network_config()
