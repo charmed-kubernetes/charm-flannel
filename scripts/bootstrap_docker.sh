@@ -12,7 +12,7 @@
 # system.
 
 
-set -e
+set -ex
 
 interface=$(config-get iface)
 cidr=$(config-get cidr)
@@ -29,7 +29,7 @@ status-set maintenance "Installing Flannel networking"
 
 # Cross Platform and does not survive reboots. :cheers:
 
-docker -d -H unix:///var/run/docker-bootstrap.sock \
+docker daemon -H unix:///var/run/docker-bootstrap.sock \
        -p /var/run/docker-bootstrap.pid \
        --iptables=false \
        --ip-masq=false \
