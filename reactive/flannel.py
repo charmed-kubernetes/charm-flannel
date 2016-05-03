@@ -10,7 +10,6 @@ from charms.reactive import when_not
 
 from charmhelpers.core.hookenv import status_set
 from charmhelpers.core import unitdata
-from charmhelpers.core import host
 
 import charms.apt
 
@@ -76,7 +75,7 @@ def ingest_network_config():
 
 @when('flannel.configuring')
 def reconfigure_docker_for_sdn():
-    status_set('maintenance', 'Configuring docker daemon for Flannel Networking')
+    status_set('maintenance', 'Configuring docker for Flannel Networking')
     cmd = "ifconfig docker0 down"
     check_call(split(cmd))
 
