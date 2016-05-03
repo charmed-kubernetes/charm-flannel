@@ -27,6 +27,7 @@ from charmhelpers.core import unitdata
 def halt_execution():
     status_set('blocked', 'Pending etcd relation.')
 
+
 @when('docker.ready', 'etcd.available')
 def run_bootstrap_daemons(etcd):
     ''' Starts a bootstrap docker service on /var/run/docker-bootstrap.sock
@@ -41,7 +42,8 @@ def run_bootstrap_daemons(etcd):
 
 
 def ingest_network_config():
-    ''' Ingest an ENV file, and parse it for data to be consumed in charm logic. '''
+    '''Ingest the environment file with the subnet information, and parse it
+    for data to be consumed in charm logic. '''
     db = unitdata.kv()
 
     if db.get('sdn_subnet') and db.get('sdn_mtu'):
@@ -49,7 +51,8 @@ def ingest_network_config():
         return
 
     if not os.path.isfile('subnet.env'):
-        status_set('waiting', 'Waiting for flannel to come online')
+        status_set('waiting', 'No subnet file to ingest.')
+        return
 
     with open('subnet.env') as f:
         flannel_config = f.readlines()

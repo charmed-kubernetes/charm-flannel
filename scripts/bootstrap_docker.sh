@@ -70,7 +70,7 @@ flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
             -v /dev/net:/dev/net \
             quay.io/coreos/flannel:0.5.3 /opt/bin/flanneld -iface="${interface}" -etcd-endpoints="${connection_string}")
 
-sleep 5
+sleep 6
 
 # Copy flannel env out and source it on the host
 docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
