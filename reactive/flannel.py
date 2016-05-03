@@ -2,12 +2,17 @@ import os
 from shlex import split
 from subprocess import check_call
 
+from charms.docker import DockerOpts
+
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
 
 from charmhelpers.core.hookenv import status_set
 from charmhelpers.core import unitdata
+from charmhelpers.core import host
+
+import charms.apt
 
 # Network Port Map
 # protocol | port | source       | purpose
@@ -45,6 +50,7 @@ def ingest_network_config():
     '''Ingest the environment file with the subnet information, and parse it
     for data to be consumed in charm logic. '''
     db = unitdata.kv()
+    opts = DockerOpts()
 
     if db.get('sdn_subnet') and db.get('sdn_mtu'):
         # We have values, and are possibly good to go
@@ -59,6 +65,24 @@ def ingest_network_config():
 
     for f in flannel_config:
         if "FLANNEL_SUBNET" in f:
-            db.set('sdn_subnet', f.split('=')[-1].strip())
+            value = f.split('=')[-1].strip()
+            db.set('sdn_subnet', value)
+            opts.add('bip', value)
         if "FLANNEL_MTU" in f:
-            db.set('sdn_mtu', f.split('=')[1].strip())
+            value = f.split('=')[1].strip()
+            db.set('sdn_mtu', value)
+            opts.add('mtu', value)
+
+
+@when('flannel.configuring')
+def reconfigure_docker_for_sdn():
+    status_set('maintenance', 'Configuring docker daemon for Flannel Networking')
+    cmd = "ifconfig docker0 down"
+    check_call(split(cmd))
+
+    apt.queue_install(['bridge-utils'])
+
+    cmd = "brctl delbr docker0"
+    check_call(split(cmd))
+
+    set_state('docker.restart')

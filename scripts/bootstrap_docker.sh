@@ -28,12 +28,8 @@ if [ ! -f /var/run/docker-bootstrap.pid ]; then
          --graph=/var/lib/docker-bootstrap 2> /var/log/docker-bootstrap.log 1> /dev/null &
 fi
 
-status-set maintenance "Installing Flannel networking"
-
 # Give it a second
 sleep 1
-
-# Register the flannel VXLan
 
 docker -H unix:///var/run/docker-bootstrap.sock run \
         --net=host \
@@ -42,9 +38,12 @@ docker -H unix:///var/run/docker-bootstrap.sock run \
         etcdctl -C "${connection_string}" set /coreos.com/network/config "{ \"Network\": \"${cidr}\", \"Backend\": {\"Type\": \"vxlan\"}}"
 
 
-RUNNING=$(docker -H unix:///var/run/docker-boostrap.sock ps -f name=flannel -q)
+flannelCID=$(docker -H unix:///var/run/docker-boostrap.sock ps -f name=flannel -q)
 # Run flannel daemon to establish the overlay tunnel
-if [[ "${RUNNING}" ]]; then
+if [[ "${flannelCID}" == "" ]]; then
+  status-set maintenance "Installing Flannel networking"
+
+  # Register the flannel VXLan
   flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock run \
               --restart=always \
               -d \
@@ -55,15 +54,9 @@ if [[ "${RUNNING}" ]]; then
               quay.io/coreos/flannel:latest /opt/bin/flanneld -iface="${interface}" -etcd-endpoints="${connection_string}")
 
   sleep 6
-
-  # Copy flannel env out and source it on the host
-  docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
-  source subnet.env
-
-  # finalize flannel setup
-  # TODO: move this to the charm code
-  DOCKER_CONF="/etc/default/docker"
-  echo "DOCKER_OPTS=\"\$DOCKER_OPTS --mtu=${FLANNEL_MTU} --bip=${FLANNEL_SUBNET}\"" | sudo tee -a ${DOCKER_CONF}
-  ifconfig docker0 down
-apt-get install -y bridge-utils && brctl delbr docker0 && service docker restart
 fi
+
+# Copy flannel env out and source it on the host
+docker -H unix:///var/run/docker-bootstrap.sock cp ${flannelCID}:/run/flannel/subnet.env .
+
+source subnet.env
