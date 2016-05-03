@@ -80,7 +80,7 @@ def reconfigure_docker_for_sdn():
     cmd = "ifconfig docker0 down"
     check_call(split(cmd))
 
-    apt.queue_install(['bridge-utils'])
+    charms.apt.queue_install(['bridge-utils'])
 
     cmd = "brctl delbr docker0"
     check_call(split(cmd))
