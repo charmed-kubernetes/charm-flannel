@@ -50,7 +50,7 @@ if [[ "${flannelCID}" == "" ]]; then
               --net=host\
               --privileged \
               -v /dev/net:/dev/net \
-              --name=flannel
+              --name=flannel \
               quay.io/coreos/flannel:latest /opt/bin/flanneld -iface="${interface}" -etcd-endpoints="${connection_string}")
 
   sleep 6
