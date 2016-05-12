@@ -38,7 +38,7 @@ docker -H unix:///var/run/docker-bootstrap.sock run \
         etcdctl -C "${connection_string}" set /coreos.com/network/config "{ \"Network\": \"${cidr}\", \"Backend\": {\"Type\": \"vxlan\"}}"
 
 
-flannelCID=$(docker -H unix:///var/run/docker-boostrap.sock ps -f name=flannel -q)
+flannelCID=$(docker -H unix:///var/run/docker-bootstrap.sock ps -f name=flannel -q)
 # Run flannel daemon to establish the overlay tunnel
 if [[ "${flannelCID}" == "" ]]; then
   status-set maintenance "Installing Flannel networking"
@@ -51,7 +51,7 @@ if [[ "${flannelCID}" == "" ]]; then
               --privileged \
               -v /dev/net:/dev/net \
               --name=flannel \
-              quay.io/coreos/flannel:latest /opt/bin/flanneld -iface="${interface}" -etcd-endpoints="${connection_string}")
+              quay.io/coreos/flannel:0.5.5 /opt/bin/flanneld -iface="${interface}" -etcd-endpoints="${connection_string}")
 
   sleep 6
 fi
