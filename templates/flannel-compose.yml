@@ -14,7 +14,7 @@ flannel:
     - -iface={{ iface }}
     - -etcd-endpoints={{ connection_string }}
     {% if cert_path -%}
-    - --remote-certfile=/tls/client-cert.pem
-    - --remote-keyfile=/tls/client-key.pem
-    - --remote-cafile=/tls/client-ca.pem
+    - -etcd-certfile=/tls/client-cert.pem
+    - -etcd-keyfile=/tls/client-key.pem
+    - -etcd-cafile=/tls/client-ca.pem
     {%- endif %}
