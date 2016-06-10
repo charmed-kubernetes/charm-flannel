@@ -8,6 +8,8 @@ description: |
 tags:
   - containers
   - networking
+series:
+  - trusty
 subordinate: false
 requires:
   etcd:
