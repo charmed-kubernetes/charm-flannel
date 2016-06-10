@@ -71,8 +71,8 @@ def initialize_networking_configuration(etcd):
     context.update({'connection_string': etcd.connection_string(),
                     'socket': 'unix:///var/run/docker-bootstrap.sock'})
 
-    # todo: need chmod +x
-    render('subnet-runner.sh', 'files/swarm/subnet.sh', context)
+    render('subnet-runner.sh', 'files/flannel/subnet.sh', context, perms=0o755)
+    check_call(split('files/flannel/subnet.sh'))
     set_state('flannel.subnet.configured')
 
 
