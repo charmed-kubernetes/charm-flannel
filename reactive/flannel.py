@@ -56,8 +56,7 @@ def deploy_docker_bootstrap_daemon():
     set_state('bootstrap_daemon.available')
 
 
-@when('bootstrap_daemon.available')
-@when_any('etcd.available', 'etcd.tls.available')
+@when('bootstrap_daemon.available', 'etcd.available')
 @when_not('sdn.available')
 def initialize_networking_configuration(etcd):
     ''' Use an emphemeral instance of the configured ETCD container to
@@ -88,8 +87,7 @@ def initialize_networking_configuration(etcd):
     set_state('flannel.subnet.configured')
 
 
-@when('flannel.subnet.configured')
-@when_any('etcd.available', 'etcd.tls.available')
+@when('flannel.subnet.configured', 'etcd.available')
 @when_not('sdn.available')
 def run_flannel(etcd):
     ''' Render the docker-compose template, and run the flannel daemon '''
