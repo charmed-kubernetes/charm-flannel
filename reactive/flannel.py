@@ -4,9 +4,11 @@ from subprocess import check_call
 from charms.docker import Compose
 from charms.docker import DockerOpts
 
+from charms.reactive import is_state
 from charms.reactive import set_state
 from charms.reactive import remove_state
 from charms.reactive import when
+from charms.reactive import when_any
 from charms.reactive import when_not
 from charms.templating.jinja2 import render
 from charmhelpers.core.hookenv import config
@@ -37,24 +39,25 @@ def halt_execution():
 
 
 @when('docker.ready')
-@when_not('flannel.bootstrap_daemon.available')
+@when_not('bootstrap_daemon.available')
 def deploy_docker_bootstrap_daemon():
     ''' This is a nifty trick. We're going to init and start
     a secondary docker engine instance to run applications that
     can modify the "workload docker engine" '''
     # Render static template for init job
     status_set('maintenance', 'configuring bootstrap docker daemon')
-    render('flannel-upstart', '/etc/init/bootstrap-docker.conf', {},
+    render('bootstrap-docker.upstart', '/etc/init/bootstrap-docker.conf', {},
            owner='root', group='root')
     # Render static template for daemon options
-    render('flannel-defaults', '/etc/default/bootstrap-docker', {},
+    render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
            owner='root', group='root')
     # start the bootstrap daemon
     service_restart('bootstrap-docker')
-    set_state('flannel.bootstrap_daemon.available')
+    set_state('bootstrap_daemon.available')
 
 
-@when('flannel.bootstrap_daemon.available', 'etcd.available')
+@when('bootstrap_daemon.available')
+@when_any('etcd.available', 'etcd.tls.available')
 @when_not('sdn.available')
 def initialize_networking_configuration(etcd):
     ''' Use an emphemeral instance of the configured ETCD container to
@@ -67,27 +70,40 @@ def initialize_networking_configuration(etcd):
     status_set('maintenance', 'Configuring etcd keystore for flannel CIDR')
 
     context = {}
+    if is_state('etcd.tls.available'):
+        cert_path = '/etc/ssl/flannel'
+        etcd.save_client_credentials('{}/client-key.pem'.format(cert_path),
+                                     '{}/client-cert.pem'.format(cert_path),
+                                     '{}/client-ca.pem'.format(cert_path))
+    else:
+        cert_path = None
+
     context.update(config())
-    context.update({'connection_string': etcd.connection_string(),
-                    'socket': 'unix:///var/run/docker-bootstrap.sock'})
+    context.update({'connection_string': etcd.get_connection_string(),
+                    'socket': 'unix:///var/run/docker-bootstrap.sock',
+                    'cert_path': cert_path})
 
     render('subnet-runner.sh', 'files/flannel/subnet.sh', context, perms=0o755)
     check_call(split('files/flannel/subnet.sh'))
     set_state('flannel.subnet.configured')
 
 
-@when('flannel.subnet.configured', 'etcd.available')
+@when('flannel.subnet.configured')
+@when_any('etcd.available', 'etcd.tls.available')
 @when_not('sdn.available')
 def run_flannel(etcd):
     ''' Render the docker-compose template, and run the flannel daemon '''
 
-    cert_path = copy_and_place_certs({})
-
     status_set('maintenance', 'Starting flannel network container')
     context = {}
+    if is_state('etcd.tls.available'):
+        cert_path = '/etc/ssl/flannel'
+    else:
+        cert_path = None
+
     context.update(config())
     context.update({'charm_dir': os.getenv('CHARM_DIR'),
-                    'connection_string': etcd.connection_string(),
+                    'connection_string': etcd.get_connection_string(),
                     'cert_path': cert_path})
     render('flannel-compose.yml', 'files/flannel/docker-compose.yml', context)
 
@@ -115,10 +131,16 @@ def reconfigure_docker_for_sdn():
     set_state('docker.restart')
 
 
-@when('config.cidr.changed')
+@when_any('config.cidr.changed', 'config.etcd_image.changed',
+          'config.flannel_image.changed')
 def reconfigure_flannel_network():
     ''' When the user changes the cidr, we need to reconfigure the
     backing etcd_store, and re-launch the flannel docker container.'''
+    # Stop any running flannel containers
+    compose = Compose('files/flannel')
+    compose.kill()
+    compose.rm()
+
     remove_state('flannel.subnet.configured')
     remove_state('sdn.available')
 
@@ -149,19 +171,3 @@ def ingest_network_config():
 
     set_state('sdn.available')
     set_state('flannel.configuring')
-
-
-def copy_and_place_certs(cert):
-    ''' Unpack the dictionary passed in and place client certs. '''
-    cert_path = '/etc/ssl/flannel'
-    if not os.path.exists(cert_path):
-        os.makedirs(cert_path)
-    if cert['client_ca'] and cert['client_cert'] and cert['client_key']:
-            with open(os.path.join(cert_path, 'client-ca.pem'), 'w+') as fp:
-                fp.write(cert['client_ca'])
-            with open(os.path.join(cert_path, 'client-cert.pem'), 'w+') as fp:
-                fp.write(cert['client_cert'])
-            with open(os.path.join(cert_path, 'client-key.pem'), 'w+') as fp:
-                fp.write(cert['client_key'])
-
-    return cert_path
