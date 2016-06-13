@@ -14,10 +14,13 @@ from charms.templating.jinja2 import render
 from charmhelpers.core.hookenv import config
 from charmhelpers.core.hookenv import status_set
 from charmhelpers.core.host import service_restart
+from charmhelpers.core.host import service_stop
 from charmhelpers.core import unitdata
 
 import charms.apt
 import os
+import time
+
 
 # Network Port Map
 # protocol | port | source       | purpose
@@ -108,17 +111,27 @@ def run_flannel(etcd):
     compose = Compose('files/flannel',
                       socket='unix:///var/run/docker-bootstrap.sock')
     compose.up()
+    # Give the flannel daemon a moment to actually generate the interface
+    # configuration seed. Otherwise we enter a time/wait scenario which
+    # may cuase this to be called out of order and break the expectation
+    # of the deployment.
+    time.sleep(3)
     ingest_network_config()
 
 
 @when('flannel.configuring')
+@when_not('flannel.bridge.configured')
 def reconfigure_docker_for_sdn():
     ''' By default docker uses the docker0 bridge for container networking.
     This method removes the default docker bridge, and reconfigures the
     DOCKER_OPTS to use the flannel networking bridge '''
 
     status_set('maintenance', 'Configuring docker for Flannel Networking')
-    cmd = "ifconfig docker0 down"
+    service_stop('docker')
+    # cmd = "ifconfig docker0 down"
+    # ifconfig doesn't always work. use native linux networking commands to
+    # mark the bridge as inactive.
+    cmd = "ip link set docker0 down"
     check_call(split(cmd))
 
     charms.apt.queue_install(['bridge-utils'])
@@ -127,6 +140,7 @@ def reconfigure_docker_for_sdn():
     check_call(split(cmd))
 
     set_state('docker.restart')
+    set_state('flannel.bridge.configured')
 
 
 @when_any('config.cidr.changed', 'config.etcd_image.changed',
@@ -140,13 +154,18 @@ def reconfigure_flannel_network():
     compose.rm()
 
     remove_state('flannel.subnet.configured')
+    remove_state('flannel.bridge.configured')
     remove_state('sdn.available')
 
 
 def ingest_network_config():
-    '''Ingest the environment file with the subnet information, and
-    configure / store the flannel SDN information on the docker daemon
-    and in unitdata for other layers to access'''
+    ''' When flannel configures itself on first boot, it generates an
+    environment file (subnet.env).
+
+    We will parse the data we need from this and cache in unitdata so we
+    can hand it off between layers, and place in the dockeropts databag
+    to configure the workload docker daemon
+    '''
     db = unitdata.kv()
     opts = DockerOpts()
 
