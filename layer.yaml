@@ -1,1 +1,2 @@
 includes: ['interface:etcd', 'layer:docker', 'layer:apt']
+repo: https://github.com/juju-solutions/layer-flannel.git

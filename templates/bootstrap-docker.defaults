@@ -1,0 +1,4 @@
+# THIS FILE IS UNDER THE CONTROL OF JUJU
+# MANUAL EDITS WILL NOT PERSIST
+
+DOCKER_OPTS="-H unix://var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid  --iptables=false --ip-masq=false --bridge=none --graph=/var/lib/docker-bootstrap"
