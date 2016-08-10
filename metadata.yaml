@@ -1,16 +1,3 @@
-name: flannel
-summary: charm-build layer for flannel
-maintainers:
-    - Charles Butler <charles.butler@canonical.com>
-description: |
-  A minimalist charm layer for use with charm build,
-  powered by the reactive framework to enable flannel SDN
-tags:
-  - containers
-  - networking
-series:
-  - trusty
-subordinate: false
 requires:
   etcd:
     interface: etcd
