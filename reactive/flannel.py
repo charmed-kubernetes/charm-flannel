@@ -20,6 +20,7 @@ from charmhelpers.core import unitdata
 
 import charms.apt
 import os
+import subprocess
 import time
 
 
@@ -130,7 +131,7 @@ def run_flannel(etcd):
         iface = get_default_interface()
         # When detection not successful, print message and return.
         if not iface:
-            status_set('blocked', "Interface detection failed. " 
+            status_set('blocked', "Interface detection failed. "
                        "Set charm's iface config option.")
             return
     # Add additional key/values to the context dictionary.
@@ -228,10 +229,10 @@ def get_default_interface():
     # The route command lists the default interfaces.
     # Destination    Gateway        Genmask      Flags Metric Ref    Use Iface
     # default        10.128.0.1     0.0.0.0      UG    0      0        0 ens4
-    output = subprocess.check_output(cmd)
+    output = subprocess.check_output(cmd).decode('utf8')
     # Parse each onen of the lines.
     for line in output.split('\n'):
         # When the line contains 'default'.
         if 'default' in line:
             # The last column is the network interface.
-            return line.split(' ')[-1])
+            return line.split(' ')[-1]
