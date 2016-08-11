@@ -121,11 +121,23 @@ def run_flannel(etcd):
         cert_path = '/etc/ssl/flannel'
     else:
         cert_path = None
-
+    # Put all the configuration values in the context dictionary.
     context.update(config())
+    iface = config('iface')
+    # When iface is None or empty string.
+    if not iface:
+        # Attempt to detect the default interface.
+        iface = get_default_interface()
+        # When detection not successful, print message and return.
+        if not iface:
+            status_set('blocked', "Interface detection failed. " 
+                       "Set charm's iface config option.")
+            return
+    # Add additional key/values to the context dictionary.
     context.update({'charm_dir': os.getenv('CHARM_DIR'),
                     'connection_string': etcd.get_connection_string(),
                     'cert_path': cert_path})
+    # Render the flannel-compose.yml file using the current context.
     render('flannel-compose.yml', 'files/flannel/docker-compose.yml', context)
 
     compose = Compose('files/flannel',
@@ -133,7 +145,7 @@ def run_flannel(etcd):
     compose.up()
     # Give the flannel daemon a moment to actually generate the interface
     # configuration seed. Otherwise we enter a time/wait scenario which
-    # may cuase this to be called out of order and break the expectation
+    # may cause this to be called out of order and break the expectation
     # of the deployment.
     time.sleep(3)
     ingest_network_config()
@@ -164,7 +176,7 @@ def reconfigure_docker_for_sdn():
 
 
 @when_any('config.cidr.changed', 'config.etcd_image.changed',
-          'config.flannel_image.changed')
+          'config.flannel_image.changed', 'config.iface.changed')
 def reconfigure_flannel_network():
     ''' When the user changes the cidr, we need to reconfigure the
     backing etcd_store, and re-launch the flannel docker container.'''
@@ -208,3 +220,18 @@ def ingest_network_config():
 
     set_state('sdn.available')
     set_state('flannel.configuring')
+
+
+def get_default_interface():
+    '''Find the default network interface for this host.'''
+    cmd = ['route']
+    # The route command lists the default interfaces.
+    # Destination    Gateway        Genmask      Flags Metric Ref    Use Iface
+    # default        10.128.0.1     0.0.0.0      UG    0      0        0 ens4
+    output = subprocess.check_output(cmd)
+    # Parse each onen of the lines.
+    for line in output.split('\n'):
+        # When the line contains 'default'.
+        if 'default' in line:
+            # The last column is the network interface.
+            return line.split(' ')[-1])
