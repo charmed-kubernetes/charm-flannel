@@ -52,6 +52,11 @@ def deploy_docker_bootstrap_daemon():
     status_set('maintenance', 'configuring bootstrap docker daemon')
     codename = host.lsb_release()['DISTRIB_CODENAME']
 
+    # Render static template for daemon options
+    render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
+           owner='root', group='root')
+ 
+
     # The templates are static, but running through the templating engine for
     # future modification. This doesn't add much overhead.
     if codename == 'trusty':
@@ -60,12 +65,16 @@ def deploy_docker_bootstrap_daemon():
     else:
         # Render the service definition
         render('bootstrap-docker.service',
-               '/etc/systemd/system/multi-user.target.wants/bootstrap-docker.service',  # noqa
+               '/lib/systemd/system/bootstrap-docker.service', 
                {}, owner='root', group='root')
         # let systemd allocate the unix socket
         render('bootstrap-docker.service',
-               '/etc/systemd/system/sockets.target.wants/bootstrap-docker.socket',  # noqa
+               '/lib/systemd/system/bootstrap-docker.socket',
                {}, owner='root', group='root')
+	# this creates the proper symlinks in /etc/systemd/system path
+        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.socket'))
+        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.service'))
+
 
     # Render static template for daemon options
     render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
@@ -98,7 +107,7 @@ def initialize_networking_configuration(etcd):
 
     context.update(config())
     context.update({'connection_string': etcd.get_connection_string(),
-                    'socket': 'unix:///var/run/docker-bootstrap.sock',
+                    'socket': 'unix:///var/run/bootstrap-docker.sock',
                     'cert_path': cert_path})
 
     render('subnet-runner.sh', 'files/flannel/subnet.sh', context, perms=0o755)
@@ -125,7 +134,7 @@ def run_flannel(etcd):
     render('flannel-compose.yml', 'files/flannel/docker-compose.yml', context)
 
     compose = Compose('files/flannel',
-                      socket='unix:///var/run/docker-bootstrap.sock')
+                      socket='unix:///var/run/bootstrap-docker.sock')
     compose.up()
     # Give the flannel daemon a moment to actually generate the interface
     # configuration seed. Otherwise we enter a time/wait scenario which
