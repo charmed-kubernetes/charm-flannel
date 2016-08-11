@@ -15,6 +15,7 @@ from charmhelpers.core.hookenv import config
 from charmhelpers.core.hookenv import status_set
 from charmhelpers.core.host import service_restart
 from charmhelpers.core.host import service_stop
+from charmhelpers.core import host
 from charmhelpers.core import unitdata
 
 import charms.apt
@@ -49,8 +50,23 @@ def deploy_docker_bootstrap_daemon():
     can modify the "workload docker engine" '''
     # Render static template for init job
     status_set('maintenance', 'configuring bootstrap docker daemon')
-    render('bootstrap-docker.upstart', '/etc/init/bootstrap-docker.conf', {},
-           owner='root', group='root')
+    codename = host.lsb_release()['DISTRIB_CODENAME']
+
+    # The templates are static, but running through the templating engine for
+    # future modification. This doesn't add much overhead.
+    if codename == 'trusty':
+        render('bootstrap-docker.upstart', '/etc/init/bootstrap-docker.conf',
+               {}, owner='root', group='root')
+    else:
+        # Render the service definition
+        render('bootstrap-docker.service',
+               '/etc/systemd/system/multi-user.target.wants/bootstrap-docker.service',  # noqa
+               {}, owner='root', group='root')
+        # let systemd allocate the unix socket
+        render('bootstrap-docker.service',
+               '/etc/systemd/system/sockets.target.wants/bootstrap-docker.socket',  # noqa
+               {}, owner='root', group='root')
+
     # Render static template for daemon options
     render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
            owner='root', group='root')
