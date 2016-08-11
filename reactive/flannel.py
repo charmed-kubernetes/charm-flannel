@@ -49,7 +49,7 @@ def deploy_docker_bootstrap_daemon():
     a secondary docker engine instance to run applications that
     can modify the "workload docker engine" '''
     # Render static template for init job
-    status_set('maintenance', 'configuring bootstrap docker daemon')
+    status_set('maintenance', 'Configuring bootstrap docker daemon.')
     codename = host.lsb_release()['DISTRIB_CODENAME']
 
     # Render static template for daemon options
@@ -68,17 +68,13 @@ def deploy_docker_bootstrap_daemon():
                '/lib/systemd/system/bootstrap-docker.service', 
                {}, owner='root', group='root')
         # let systemd allocate the unix socket
-        render('bootstrap-docker.service',
+        render('bootstrap-docker.socket',
                '/lib/systemd/system/bootstrap-docker.socket',
                {}, owner='root', group='root')
 	# this creates the proper symlinks in /etc/systemd/system path
-        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.socket'))
-        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.service'))
+        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.socket'))  # noqa
+        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.service'))  # noqa
 
-
-    # Render static template for daemon options
-    render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
-           owner='root', group='root')
     # start the bootstrap daemon
     service_restart('bootstrap-docker')
     set_state('bootstrap_daemon.available')
@@ -94,7 +90,7 @@ def initialize_networking_configuration(etcd):
     # Due to how subprocess mangles the JSON string, turn the hack script
     # formerly known as scripts/bootstrap.sh into this single-command
     # wrapper, under template control.
-    status_set('maintenance', 'Configuring etcd keystore for flannel CIDR')
+    status_set('maintenance', 'Configuring etcd keystore for flannel CIDR.')
 
     context = {}
     if is_state('etcd.tls.available'):
@@ -120,7 +116,7 @@ def initialize_networking_configuration(etcd):
 def run_flannel(etcd):
     ''' Render the docker-compose template, and run the flannel daemon '''
 
-    status_set('maintenance', 'Starting flannel network container')
+    status_set('maintenance', 'Starting flannel network container.')
     context = {}
     if is_state('etcd.tls.available'):
         cert_path = '/etc/ssl/flannel'
@@ -151,7 +147,7 @@ def reconfigure_docker_for_sdn():
     This method removes the default docker bridge, and reconfigures the
     DOCKER_OPTS to use the flannel networking bridge '''
 
-    status_set('maintenance', 'Configuring docker for Flannel Networking')
+    status_set('maintenance', 'Configuring docker for flannel networking.')
     service_stop('docker')
     # cmd = "ifconfig docker0 down"
     # ifconfig doesn't always work. use native linux networking commands to
