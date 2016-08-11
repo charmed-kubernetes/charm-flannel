@@ -55,7 +55,6 @@ def deploy_docker_bootstrap_daemon():
     # Render static template for daemon options
     render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
            owner='root', group='root')
- 
 
     # The templates are static, but running through the templating engine for
     # future modification. This doesn't add much overhead.
@@ -65,13 +64,13 @@ def deploy_docker_bootstrap_daemon():
     else:
         # Render the service definition
         render('bootstrap-docker.service',
-               '/lib/systemd/system/bootstrap-docker.service', 
+               '/lib/systemd/system/bootstrap-docker.service',
                {}, owner='root', group='root')
         # let systemd allocate the unix socket
         render('bootstrap-docker.socket',
                '/lib/systemd/system/bootstrap-docker.socket',
                {}, owner='root', group='root')
-	# this creates the proper symlinks in /etc/systemd/system path
+        # this creates the proper symlinks in /etc/systemd/system path
         check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.socket'))  # noqa
         check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.service'))  # noqa
 
