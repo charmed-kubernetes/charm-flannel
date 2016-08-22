@@ -66,7 +66,7 @@ def deploy_docker_bootstrap_daemon():
         # Render the service definition
         render('bootstrap-docker.service',
                '/lib/systemd/system/bootstrap-docker.service',
-               {}, owner='root', group='root')
+               config(), owner='root', group='root')
         # let systemd allocate the unix socket
         render('bootstrap-docker.socket',
                '/lib/systemd/system/bootstrap-docker.socket',
