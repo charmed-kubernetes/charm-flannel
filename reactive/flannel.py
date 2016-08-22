@@ -177,7 +177,8 @@ def reconfigure_docker_for_sdn():
 
 
 @when_any('config.cidr.changed', 'config.etcd_image.changed',
-          'config.flannel_image.changed', 'config.iface.changed')
+          'config.flannel_image.changed', 'config.iface.changed',
+          'config.http_proxy.changed', 'config.https_proxy.changed')
 def reconfigure_flannel_network():
     ''' When the user changes the cidr, we need to reconfigure the
     backing etcd_store, and re-launch the flannel docker container.'''
