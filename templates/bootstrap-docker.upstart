@@ -9,6 +9,12 @@ respawn
 
 kill timeout 20
 
+# Support proxy limited environments
+{% if http_proxy or https_proxy %}
+env HTTP_PROXY={{ http_proxy }}
+env HTTPS_PROXY={{ https_proxy }}
+{% enif %}
+
 pre-start script
         # see also https://github.com/tianon/cgroupfs-mount/blob/master/cgroupfs-mount
         if grep -v '^#' /etc/fstab | grep -q cgroup \
