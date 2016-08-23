@@ -173,6 +173,7 @@ def reconfigure_docker_for_sdn():
     check_call(split(cmd))
 
     set_state('docker.restart')
+    remove_state('flannel.configuring')
     set_state('flannel.bridge.configured')
 
 
