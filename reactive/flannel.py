@@ -61,7 +61,7 @@ def deploy_docker_bootstrap_daemon():
     # future modification. This doesn't add much overhead.
     if codename == 'trusty':
         render('bootstrap-docker.upstart', '/etc/init/bootstrap-docker.conf',
-               {}, owner='root', group='root')
+               config(), owner='root', group='root')
     else:
         # Render the service definition
         render('bootstrap-docker.service',
@@ -176,9 +176,42 @@ def reconfigure_docker_for_sdn():
     set_state('flannel.bridge.configured')
 
 
+@when_any('config.http_proxy.changed', 'config.https_proxy.changed')
+def rerender_service_template():
+    ''' If we change proxy settings, re-render the bootstrap service definition
+    and attempt to resume where we left off.  '''
+
+    # Note: At this point if we hijack the workload daemon, heavy fisted
+    # reprocussions will occur, like disruption  of services.
+
+    codename = host.lsb_release()['DISTRIB_CODENAME']
+    # by default, dont reboot the daemon unless we have previously rendered
+    # system files.
+
+    # Deterministic method to probe if we actually need to restart the
+    # daemon.
+    reboot = (os.path.exists('/lib/systemd/system/bootstrap-docker.service') or
+              os.path.exists('/etc/init/bootstrap-docker.conf'))
+
+    if codename != "trusty":
+        # Handle SystemD
+        render('bootstrap-docker.service',
+               '/lib/systemd/system/bootstrap-docker.service',
+               config(), owner='root', group='root')
+        cmd = ["systemctl", "daemon-reload"]
+        check_call(cmd)
+    else:
+        # Handle Upstart
+        render('bootstrap-docker.upstart',
+               '/etc/init/bootstrap-docker.conf',
+               config(), owner='root', group='root')
+
+    if reboot:
+        service_restart('bootstrap-docker')
+
+
 @when_any('config.cidr.changed', 'config.etcd_image.changed',
-          'config.flannel_image.changed', 'config.iface.changed',
-          'config.http_proxy.changed', 'config.https_proxy.changed')
+          'config.flannel_image.changed', 'config.iface.changed')
 def reconfigure_flannel_network():
     ''' When the user changes the cidr, we need to reconfigure the
     backing etcd_store, and re-launch the flannel docker container.'''
