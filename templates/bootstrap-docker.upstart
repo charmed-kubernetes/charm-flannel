@@ -13,7 +13,7 @@ kill timeout 20
 {% if http_proxy or https_proxy %}
 env HTTP_PROXY={{ http_proxy }}
 env HTTPS_PROXY={{ https_proxy }}
-{% enif %}
+{% endif %}
 
 pre-start script
         # see also https://github.com/tianon/cgroupfs-mount/blob/master/cgroupfs-mount
