@@ -1,264 +1,27 @@
-from shlex import split
-from subprocess import check_call
-
-from charms.docker import Compose
-from charms.docker import DockerOpts
-
+from charms.reactive import hook
 from charms.reactive import is_state
 from charms.reactive import set_state
-from charms.reactive import remove_state
+# from charms.reactive import remove_state
 from charms.reactive import when
-from charms.reactive import when_any
 from charms.reactive import when_not
-from charms.templating.jinja2 import render
-from charmhelpers.core.hookenv import config
-from charmhelpers.core.hookenv import status_set
-from charmhelpers.core.host import service_restart
-from charmhelpers.core.host import service_stop
-from charmhelpers.core import host
-from charmhelpers.core import unitdata
 
-import charms.apt
+from charms.templating.jinja2 import render
+from charmhelpers.core import host
+from charmhelpers.core import hookenv
+
+from shlex import split
+
+from subprocess import Popen
+from subprocess import PIPE
+from subprocess import STDOUT
+
+import etcd
+import json
 import os
 import subprocess
-import time
 
 
-# Network Port Map
-# protocol | port | source       | purpose
-# ----------------------------------------------------------------------
-# UDP     | 8285  | worker nodes | Flannel overlay network - UDP Backend.
-# UDP     | 8472  | worker nodes | Flannel overlay network - vxlan backend
-
-
-# Example subnet.env file
-# FLANNEL_NETWORK=10.1.0.0/16
-# FLANNEL_SUBNET=10.1.57.1/24
-# FLANNEL_MTU=1450
-# FLANNEL_IPMASQ=false
-
-@when('docker.ready', 'flannel.bootstrap_daemon.available')
-@when_not('etcd.connected')
-def halt_execution():
-    status_set('waiting', 'Waiting for etcd relation.')
-
-
-@when('docker.ready')
-@when_not('bootstrap_daemon.available')
-def deploy_docker_bootstrap_daemon():
-    ''' This is a nifty trick. We're going to init and start
-    a secondary docker engine instance to run applications that
-    can modify the "workload docker engine" '''
-    # Render static template for init job
-    status_set('maintenance', 'Configuring bootstrap docker daemon.')
-    codename = host.lsb_release()['DISTRIB_CODENAME']
-
-    # Render static template for daemon options
-    render('bootstrap-docker.defaults', '/etc/default/bootstrap-docker', {},
-           owner='root', group='root')
-
-    # The templates are static, but running through the templating engine for
-    # future modification. This doesn't add much overhead.
-    if codename == 'trusty':
-        render('bootstrap-docker.upstart', '/etc/init/bootstrap-docker.conf',
-               config(), owner='root', group='root')
-    else:
-        # Render the service definition
-        render('bootstrap-docker.service',
-               '/lib/systemd/system/bootstrap-docker.service',
-               config(), owner='root', group='root')
-        # let systemd allocate the unix socket
-        render('bootstrap-docker.socket',
-               '/lib/systemd/system/bootstrap-docker.socket',
-               {}, owner='root', group='root')
-        # this creates the proper symlinks in /etc/systemd/system path
-        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.socket'))  # noqa
-        check_call(split('systemctl enable /lib/systemd/system/bootstrap-docker.service'))  # noqa
-
-    # start the bootstrap daemon
-    service_restart('bootstrap-docker')
-    set_state('bootstrap_daemon.available')
-
-
-@when('bootstrap_daemon.available', 'etcd.available')
-@when_not('sdn.available')
-def initialize_networking_configuration(etcd):
-    ''' Use an emphemeral instance of the configured ETCD container to
-    initialize the CIDR range flannel can pull from. This becomes a single
-    use tool.
-    '''
-    # Due to how subprocess mangles the JSON string, turn the hack script
-    # formerly known as scripts/bootstrap.sh into this single-command
-    # wrapper, under template control.
-    status_set('maintenance', 'Configuring etcd keystore for flannel CIDR.')
-
-    context = {}
-    if is_state('etcd.tls.available'):
-        cert_path = '/etc/ssl/flannel'
-        etcd.save_client_credentials('{}/client-key.pem'.format(cert_path),
-                                     '{}/client-cert.pem'.format(cert_path),
-                                     '{}/client-ca.pem'.format(cert_path))
-    else:
-        cert_path = None
-
-    context.update(config())
-    context.update({'connection_string': etcd.get_connection_string(),
-                    'socket': 'unix:///var/run/bootstrap-docker.sock',
-                    'cert_path': cert_path})
-
-    render('subnet-runner.sh', 'files/flannel/subnet.sh', context, perms=0o755)
-    check_call(split('files/flannel/subnet.sh'))
-    set_state('flannel.subnet.configured')
-
-
-@when('flannel.subnet.configured', 'etcd.available')
-@when_not('sdn.available')
-def run_flannel(etcd):
-    ''' Render the docker-compose template, and run the flannel daemon '''
-
-    status_set('maintenance', 'Starting flannel network container.')
-    context = {}
-    if is_state('etcd.tls.available'):
-        cert_path = '/etc/ssl/flannel'
-    else:
-        cert_path = None
-    # Put all the configuration values in the context dictionary.
-    context.update(config())
-    iface = config('iface')
-    # When iface is None or empty string.
-    if not iface:
-        # Attempt to detect the default interface.
-        iface = get_default_interface()
-        # When detection not successful, print message and return.
-        if not iface:
-            status_set('blocked', "Interface detection failed. "
-                       "Set charm's iface config option.")
-            return
-    # Add additional key/values to the context dictionary.
-    context.update({'charm_dir': os.getenv('CHARM_DIR'),
-                    'connection_string': etcd.get_connection_string(),
-                    'cert_path': cert_path})
-    # Render the flannel-compose.yml file using the current context.
-    render('flannel-compose.yml', 'files/flannel/docker-compose.yml', context)
-
-    compose = Compose('files/flannel',
-                      socket='unix:///var/run/bootstrap-docker.sock')
-    compose.up()
-    # Give the flannel daemon a moment to actually generate the interface
-    # configuration seed. Otherwise we enter a time/wait scenario which
-    # may cause this to be called out of order and break the expectation
-    # of the deployment.
-    time.sleep(3)
-    ingest_network_config()
-
-
-@when('flannel.configuring')
-@when_not('flannel.bridge.configured')
-def reconfigure_docker_for_sdn():
-    ''' By default docker uses the docker0 bridge for container networking.
-    This method removes the default docker bridge, and reconfigures the
-    DOCKER_OPTS to use the flannel networking bridge '''
-
-    status_set('maintenance', 'Configuring docker for flannel networking.')
-    service_stop('docker')
-    # cmd = "ifconfig docker0 down"
-    # ifconfig doesn't always work. use native linux networking commands to
-    # mark the bridge as inactive.
-    cmd = "ip link set docker0 down"
-    check_call(split(cmd))
-
-    charms.apt.queue_install(['bridge-utils'])
-
-    cmd = "brctl delbr docker0"
-    check_call(split(cmd))
-
-    set_state('docker.restart')
-    remove_state('flannel.configuring')
-    set_state('flannel.bridge.configured')
-
-
-@when_any('config.http_proxy.changed', 'config.https_proxy.changed')
-def rerender_service_template():
-    ''' If we change proxy settings, re-render the bootstrap service definition
-    and attempt to resume where we left off.  '''
-
-    # Note: At this point if we hijack the workload daemon, heavy fisted
-    # reprocussions will occur, like disruption  of services.
-
-    codename = host.lsb_release()['DISTRIB_CODENAME']
-    # by default, dont reboot the daemon unless we have previously rendered
-    # system files.
-
-    # Deterministic method to probe if we actually need to restart the
-    # daemon.
-    reboot = (os.path.exists('/lib/systemd/system/bootstrap-docker.service') or
-              os.path.exists('/etc/init/bootstrap-docker.conf'))
-
-    if codename != "trusty":
-        # Handle SystemD
-        render('bootstrap-docker.service',
-               '/lib/systemd/system/bootstrap-docker.service',
-               config(), owner='root', group='root')
-        cmd = ["systemctl", "daemon-reload"]
-        check_call(cmd)
-    else:
-        # Handle Upstart
-        render('bootstrap-docker.upstart',
-               '/etc/init/bootstrap-docker.conf',
-               config(), owner='root', group='root')
-
-    if reboot:
-        service_restart('bootstrap-docker')
-
-
-@when_any('config.cidr.changed', 'config.etcd_image.changed',
-          'config.flannel_image.changed', 'config.iface.changed')
-def reconfigure_flannel_network():
-    ''' When the user changes the cidr, we need to reconfigure the
-    backing etcd_store, and re-launch the flannel docker container.'''
-    # Stop any running flannel containers
-    compose = Compose('files/flannel')
-    compose.kill()
-    compose.rm()
-
-    remove_state('flannel.subnet.configured')
-    remove_state('flannel.bridge.configured')
-    remove_state('sdn.available')
-
-
-def ingest_network_config():
-    ''' When flannel configures itself on first boot, it generates an
-    environment file (subnet.env).
-
-    We will parse the data we need from this and cache in unitdata so we
-    can hand it off between layers, and place in the dockeropts databag
-    to configure the workload docker daemon
-    '''
-    db = unitdata.kv()
-    opts = DockerOpts()
-
-    if not os.path.isfile('subnet.env'):
-        status_set('waiting', 'No subnet file to ingest.')
-        return
-
-    with open('subnet.env') as f:
-        flannel_config = f.readlines()
-
-    for f in flannel_config:
-        if "FLANNEL_SUBNET" in f:
-            value = f.split('=')[-1].strip()
-            db.set('sdn_subnet', value)
-            opts.add('bip', value)
-        if "FLANNEL_MTU" in f:
-            value = f.split('=')[1].strip()
-            db.set('sdn_mtu', value)
-            opts.add('mtu', value)
-
-    set_state('sdn.available')
-    set_state('flannel.configuring')
-
-
-def get_default_interface():
+def _get_default_interface():
     '''Find the default network interface for this host.'''
     cmd = ['route']
     # The route command lists the default interfaces.
@@ -271,3 +34,182 @@ def get_default_interface():
         if 'default' in line:
             # The last column is the network interface.
             return line.split(' ')[-1]
+
+
+def _unpack_resource(tarball, output_dir):
+    ''' unpack an arbitrary tarball to an arbitrary path '''
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    command = 'tar -xzf {0} -C {1}'.format(tarball, output_dir)
+    subprocess.check_call(split(command))
+
+
+def _install_files(file_path, output_path):
+    ''' Install files using the unix 'install' command '''
+    command = 'install -v {0} {1}'.format(file_path, output_path)
+    subprocess.check_call(split(command))
+
+
+def _build_context(reldata):
+    ''' Assemble the context dict for use when rendering files'''
+    context = {}
+    # Assume the TLS credentials have been placed
+    if is_state('etcd.tls.available'):
+        cert_path = '/etc/ssl/flannel'
+        reldata.save_client_credentials('{}/client-key.pem'.format(cert_path),
+                                        '{}/client-cert.pem'.format(cert_path),
+                                        '{}/client-ca.pem'.format(cert_path))
+    else:
+        cert_path = None
+    context.update(hookenv.config())
+    if not hookenv.config('iface'):
+        context.update({'iface': _get_default_interface()})
+    context.update({'connection_string': reldata.get_connection_string(),
+                    'cert_path': cert_path})
+
+    return context
+
+
+def _initialize_etcd_with_data(reldata):
+    ''' Before flannel can start up, we need to seed etcd with with configured
+    CIDR. '''
+
+    connection_string = reldata.get_connection_string()
+
+    # Potential issue with how we are parsing a host out of hte string, we
+    # dont know if the host is degraded either. This assumes the first host
+    # in the connection-string will do what we need it to do.
+    host = connection_string.split(':')[1].lstrip('//')
+    port = connection_string.split(':')[2]
+
+    tls_required = is_state('etcd.tls.available')
+    if tls_required:
+        cert_path = '/etc/ssl/flannel'
+        key = '{}/client-key.pem'.format(cert_path)
+        cert = '{}/client-cert.pem'.format(cert_path)
+        ca = '{}/client-ca.pem'.format(cert_path)
+        client = etcd.Client(host=host, port=int(port), protocol='https',
+                             cert=(cert, key), ca_cert=ca)
+    else:
+        client = etcd.Client(host=host, port=int(port), protocol='http')
+
+    data = {"Network": hookenv.config('cidr'), "Backend": {"Type": "vxlan"}}
+    json_data = json.dumps(data)
+    client.write('/coreos.com/network/config', json_data)
+
+
+def _ingest_network_config():
+    ''' When flannel configures itself on first boot, it generates an
+    environment file (subnet.env).
+
+    return a tuple of subnet, and interface mtu'''
+
+    if not os.path.isfile('/var/run/flannel/subnet.env'):
+        hookenv.status_set('waiting', 'Flannel is starting up.')
+        return
+
+    with open('/var/run/flannel/subnet.env') as f:
+        flannel_config = f.readlines()
+
+    for f in flannel_config:
+        if "FLANNEL_SUBNET" in f:
+            value = f.split('=')[-1].strip()
+            subnet = value
+        if "FLANNEL_MTU" in f:
+            value = f.split('=')[1].strip()
+            mtu = value
+    return (subnet, mtu)
+
+
+@when_not('etcd.connected')
+def halt_execution():
+    ''' send a clear message to the user that we are waiting on etcd '''
+    hookenv.status_set('waiting', 'Waiting for etcd relation.')
+
+
+@when('etcd.available')
+@when_not('flannel.etcd.credentials.placed')
+def place_etcd_tls_credentials(etcd):
+    ''' TLS terminated etcd instances require client credentials. This is
+    a mandatory pre-requisite before we can progress '''
+    # this is likely to run first, save the TLS credentials
+    if is_state('etcd.tls.available'):
+        cert_path = '/etc/ssl/flannel'
+        etcd.save_client_credentials('{}/client-key.pem'.format(cert_path),
+                                     '{}/client-cert.pem'.format(cert_path),
+                                     '{}/client-ca.pem'.format(cert_path))
+
+    set_state('flannel.etcd.credentials.placed')
+
+
+@when_not('flannel.installed')
+def install_flannel():
+    ''' Unpack and install the binary release of flannel '''
+    hookenv.status_set('maintenance', 'Installing flannel.')
+    flannel_package = hookenv.resource_get('flannel')
+
+    if not flannel_package:
+        hookenv.status_set("blocked", "Missing resource: flannel")
+        return
+
+    charm_dir = hookenv.charm_dir()
+
+    # Unpack and install the flannel resource
+    _unpack_resource(flannel_package, '{0}/files/flannel'.format(charm_dir))
+    _install_files('./files/flannel/flanneld', '/usr/local/bin/flanneld')
+
+    set_state('flannel.installed')
+
+
+@when('flannel.installed', 'flannel.etcd.credentials.placed', 'etcd.available')
+@when_not('flannel.sdn.configured')
+def render_flannel_config(etcd):
+    ''' Consume the flannel information, and render the config files to
+    initialize flannel installation '''
+    hookenv.status_set('maintenance', 'Rendering systemd files')
+    context = _build_context(etcd)
+    render('flannel.service', '/lib/systemd/system/flannel.service', context)
+    _initialize_etcd_with_data(etcd)
+    host.service_start('flannel')
+    set_state('flannel.sdn.configured')
+
+
+@when('flannel.installed')
+def set_flannel_version():
+    ''' Surface the currently deployed version of flannel to Juju '''
+    cmd = 'flanneld -version'
+    p = Popen(cmd, shell=True,
+              stdin=PIPE,
+              stdout=PIPE,
+              stderr=STDOUT,
+              close_fds=True)
+    version = p.stdout.read()
+
+    print('====== VERSION TO BE SET IS: {}'.format(version))
+    hookenv.application_version_set(version.rstrip())
+
+
+@when('flannel.sdn.configured', 'host.connected')
+@when_not('flannel.host.relayed')
+def relay_sdn_configuration(plugin_host):
+    ''' send the flannel interface configuration to the principal unit '''
+    try:
+        subnet, mtu = _ingest_network_config()
+        plugin_host.set_configuration(subnet, mtu)
+        set_state('flannel.host.relayed')
+        hookenv.status_set('active', 'Flannel Ready')
+    except TypeError:
+        # The host has not fully started, and we have no file.
+        pass
+
+
+@hook('stop')
+def cleanup_deployment():
+    ''' Terminate services, and remove the deployed bins '''
+
+    host.service_stop('flannel')
+    files = ['/usr/local/bin/flanneld',
+             '/lib/systemd/system/flannel']
+    for f in files:
+        os.remove(f)

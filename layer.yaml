@@ -1,2 +1,5 @@
-includes: ['interface:etcd', 'layer:docker', 'layer:apt']
+includes:
+   - 'interface:etcd'
+   - 'interface:sdn-plugin'
+   - 'layer:basic'
 repo: https://github.com/juju-solutions/layer-flannel.git

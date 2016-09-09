@@ -1,1 +1,2 @@
 charms.templating.jinja2>=1.0.0,<2.0.0
+python-etcd>=0.4.0,<1.0.0

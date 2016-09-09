@@ -4,37 +4,10 @@ options:
     default: ""
     description: |
       The interface to bind flannel overlay networking. The default value is
-      the result of running the following command: 
+      the result of running the following command:
       `route | grep default | head -n 1 | awk {'print $8'}`.
   cidr:
     type: string
     default: 10.1.0.0/16
     description: |
       Network CIDR to assign to Flannel
-  etcd_image:
-    type: string
-    default: gcr.io/google_containers/etcd:2.0.12
-    description: |
-      The image to pull for the 'etcdctl' command. Recommended to
-      mirror the default on a private registry if connectivity is a concern
-  flannel_image:
-    type: string
-    default: quay.io/coreos/flannel:0.5.5
-    description: |
-      The image to pull for running 'flannel'. Recommended to
-      mirror the default on a private registry if connectivity is a concern
-  http_proxy:
-     type: string
-     default:
-     description: |
-        URL to use for HTTP_PROXY to be used by Docker. Only useful in closed
-        environments where a proxy is the only option for routing to the
-        registry to pull images
-  https_proxy:
-    type: string
-    default:
-    description: |
-        URL to use for HTTPS_PROXY to be used by Docker. Only useful in closed
-        environments where a proxy is the only option for routing to the
-        registry to pull images
-
