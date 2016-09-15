@@ -185,8 +185,6 @@ def set_flannel_version():
               stderr=STDOUT,
               close_fds=True)
     version = p.stdout.read()
-
-    print('====== VERSION TO BE SET IS: {}'.format(version))
     hookenv.application_version_set(version.rstrip())
 
 
@@ -196,9 +194,9 @@ def relay_sdn_configuration(plugin_host):
     ''' send the flannel interface configuration to the principal unit '''
     try:
         subnet, mtu = _ingest_network_config()
-        plugin_host.set_configuration(subnet, mtu)
+        plugin_host.set_configuration(mtu, subnet)
         set_state('flannel.host.relayed')
-        hookenv.status_set('active', 'Flannel Ready')
+        hookenv.status_set('active', 'Flannel ready')
     except TypeError:
         # The host has not fully started, and we have no file.
         pass
