@@ -150,8 +150,16 @@ def install_flannel():
     flannel_package = hookenv.resource_get('flannel')
 
     if not flannel_package:
-        hookenv.status_set("blocked", "Missing resource: flannel")
+        hookenv.status_set("blocked", "Missing flannel resource")
         return
+
+    # Handle null resource publication, we check if its filesize < 1mb
+    filesize = os.stat(flannel_package).st_size
+    if filesize < 1000000:
+        hookenv.status_set('blocked', 'Missing flannel resource')
+        return
+
+
 
     charm_dir = hookenv.charm_dir()
 
@@ -194,7 +202,8 @@ def relay_sdn_configuration(plugin_host):
     ''' send the flannel interface configuration to the principal unit '''
     try:
         subnet, mtu = _ingest_network_config()
-        plugin_host.set_configuration(mtu, subnet)
+        cidr = hookenv.config('cidr')
+        plugin_host.set_configuration(mtu, subnet, cidr)
         set_state('flannel.host.relayed')
         hookenv.status_set('active', 'Flannel ready')
     except TypeError:
