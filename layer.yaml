@@ -2,4 +2,4 @@ includes:
    - 'interface:etcd'
    - 'interface:sdn-plugin'
    - 'layer:basic'
-repo: https://github.com/juju-solutions/layer-flannel.git
+repo: https://github.com/juju-solutions/charm-flannel.git

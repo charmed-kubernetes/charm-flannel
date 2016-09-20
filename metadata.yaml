@@ -8,6 +8,8 @@ maintainers:
 series:
   - xenial
 subordinate: true
+tags:
+  - networking
 requires:
   etcd:
     interface: etcd
