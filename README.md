@@ -1,6 +1,6 @@
 # Flannel Charm
 
-flannel is a virtual network that gives a subnet to each host for use with
+Flannel is a virtual network that gives a subnet to each host for use with
 container runtimes.
 
 This charm will deploy flannel, render systemd templates, and allow the SDN
@@ -17,8 +17,10 @@ interface in order to properly deploy.
 
 ```
 juju deploy flannel
+juju deploy etcd
 juju deploy kubernetes-master
 juju add-relation flannel kubernetes-master
+juju add-relation flannel etcd
 ```
 
 ## Configuration
