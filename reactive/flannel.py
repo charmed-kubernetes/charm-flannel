@@ -186,6 +186,8 @@ def render_flannel_config(etcd):
 @when('flannel.installed')
 def set_flannel_version():
     ''' Surface the currently deployed version of flannel to Juju '''
+    # flanneld -version
+    # v0.6.1
     cmd = 'flanneld -version'
     p = Popen(cmd, shell=True,
               stdin=PIPE,
@@ -193,7 +195,7 @@ def set_flannel_version():
               stderr=STDOUT,
               close_fds=True)
     version = p.stdout.read()
-    hookenv.application_version_set(version.rstrip())
+    hookenv.application_version_set(version.split('v')[-1].rstrip())
 
 
 @when('flannel.sdn.configured', 'host.connected')
