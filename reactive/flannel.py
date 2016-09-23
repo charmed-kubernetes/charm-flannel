@@ -1,7 +1,7 @@
 from charms.reactive import hook
 from charms.reactive import is_state
 from charms.reactive import set_state
-# from charms.reactive import remove_state
+from charms.reactive import remove_state
 from charms.reactive import when
 from charms.reactive import when_not
 
@@ -159,8 +159,6 @@ def install_flannel():
         hookenv.status_set('blocked', 'Missing flannel resource')
         return
 
-
-
     charm_dir = hookenv.charm_dir()
 
     # Unpack and install the flannel resource
@@ -208,10 +206,18 @@ def relay_sdn_configuration(plugin_host):
         cidr = hookenv.config('cidr')
         plugin_host.set_configuration(mtu, subnet, cidr)
         set_state('flannel.host.relayed')
-        hookenv.status_set('active', 'Flannel ready')
     except TypeError:
         # The host has not fully started, and we have no file.
         pass
+
+    hookenv.status_set('active', 'Flannel subnet {0}'.format(subnet))
+
+
+@hook('upgrade-charm')
+def reset_states_and_redeploy():
+    ''' Remove state and redeploy '''
+    remove_state('flannel.host.relayed')
+    remove_state('flannel.installed')
 
 
 @hook('stop')
