@@ -195,7 +195,8 @@ def set_flannel_version():
               stderr=STDOUT,
               close_fds=True)
     version = p.stdout.read()
-    hookenv.application_version_set(version.split(b'v')[-1].rstrip())
+    if version:
+        hookenv.application_version_set(version.split(b'v')[-1].rstrip())
 
 
 @when('flannel.sdn.configured', 'host.connected')
