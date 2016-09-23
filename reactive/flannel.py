@@ -106,7 +106,8 @@ def _ingest_network_config():
     return a tuple of subnet, and interface mtu'''
 
     if not os.path.isfile('/var/run/flannel/subnet.env'):
-        hookenv.status_set('waiting', 'Flannel is starting up.')
+        # The host has not fully started, and we have no file.
+        hookenv.log('Did not find expected file: /var/run/flannel/subnet.env')
         return
 
     with open('/var/run/flannel/subnet.env') as f:
@@ -206,11 +207,9 @@ def relay_sdn_configuration(plugin_host):
         cidr = hookenv.config('cidr')
         plugin_host.set_configuration(mtu, subnet, cidr)
         set_state('flannel.host.relayed')
+        hookenv.status_set('active', 'Flannel subnet {0}'.format(subnet))
     except TypeError:
-        # The host has not fully started, and we have no file.
-        pass
-
-    hookenv.status_set('active', 'Flannel subnet {0}'.format(subnet))
+        hookenv.status_set('waiting', 'Flannel is starting up.')
 
 
 @hook('upgrade-charm')
