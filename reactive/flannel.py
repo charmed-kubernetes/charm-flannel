@@ -77,11 +77,11 @@ def _initialize_etcd_with_data(reldata):
 
     connection_string = reldata.get_connection_string()
 
-    # Potential issue with how we are parsing a host out of hte string, we
-    # dont know if the host is degraded either. This assumes the first host
-    # in the connection-string will do what we need it to do.
-    host = connection_string.split(':')[1].lstrip('//')
-    port = connection_string.split(':')[2]
+    # Rely on etcd data replication. We only need the first host
+    # out of the HA connection string (if applicable)
+    hosts = connection_string.split(',')
+    host = hosts[0].split(':')[1].lstrip('//')
+    port = hosts[0].split(':')[2]
 
     tls_required = is_state('etcd.tls.available')
     if tls_required:
