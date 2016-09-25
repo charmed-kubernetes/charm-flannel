@@ -151,13 +151,13 @@ def install_flannel():
     flannel_package = hookenv.resource_get('flannel')
 
     if not flannel_package:
-        hookenv.status_set("blocked", "Missing flannel resource")
+        hookenv.status_set("blocked", "Missing flannel resource.")
         return
 
     # Handle null resource publication, we check if its filesize < 1mb
     filesize = os.stat(flannel_package).st_size
     if filesize < 1000000:
-        hookenv.status_set('blocked', 'Missing flannel resource')
+        hookenv.status_set('blocked', 'Undersized flannel resource.')
         return
 
     charm_dir = hookenv.charm_dir()
@@ -174,7 +174,7 @@ def install_flannel():
 def render_flannel_config(etcd):
     ''' Consume the flannel information, and render the config files to
     initialize flannel installation '''
-    hookenv.status_set('maintenance', 'Rendering systemd files')
+    hookenv.status_set('maintenance', 'Rendering systemd files.')
     context = _build_context(etcd)
     render('flannel.service', '/lib/systemd/system/flannel.service', context)
     _initialize_etcd_with_data(etcd)
