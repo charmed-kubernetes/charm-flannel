@@ -94,7 +94,7 @@ def _initialize_etcd_with_data(reldata):
     else:
         client = etcd.Client(host=host, port=int(port), protocol='http')
 
-    data = {"Network": hookenv.config('cidr'), "Backend": {"Type": "vxlan"}}
+    data = {'Network': hookenv.config('cidr'), 'Backend': {'Type': 'vxlan'}}
     json_data = json.dumps(data)
     client.write('/coreos.com/network/config', json_data)
 
@@ -114,10 +114,10 @@ def _ingest_network_config():
         flannel_config = f.readlines()
 
     for f in flannel_config:
-        if "FLANNEL_SUBNET" in f:
+        if 'FLANNEL_SUBNET' in f:
             value = f.split('=')[-1].strip()
             subnet = value
-        if "FLANNEL_MTU" in f:
+        if 'FLANNEL_MTU' in f:
             value = f.split('=')[1].strip()
             mtu = value
     return (subnet, mtu)
@@ -151,7 +151,7 @@ def install_flannel():
     flannel_package = hookenv.resource_get('flannel')
 
     if not flannel_package:
-        hookenv.status_set("blocked", "Missing flannel resource.")
+        hookenv.status_set('blocked', 'Missing flannel resource.')
         return
 
     # Handle null resource publication, we check if its filesize < 1mb
