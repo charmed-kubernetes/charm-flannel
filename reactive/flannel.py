@@ -157,7 +157,7 @@ def install_flannel():
     # Handle null resource publication, we check if its filesize < 1mb
     filesize = os.stat(flannel_package).st_size
     if filesize < 1000000:
-        hookenv.status_set('blocked', 'Undersized flannel resource.')
+        hookenv.status_set('blocked', 'Incomplete flannel resource.')
         return
 
     charm_dir = hookenv.charm_dir()
