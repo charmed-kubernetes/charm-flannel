@@ -227,4 +227,5 @@ def cleanup_deployment():
     files = ['/usr/local/bin/flanneld',
              '/lib/systemd/system/flannel']
     for f in files:
-        os.remove(f)
+        if os.path.exists(f):
+            os.remove(f)
