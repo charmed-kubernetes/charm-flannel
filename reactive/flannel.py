@@ -223,9 +223,33 @@ def reset_states_and_redeploy():
 def cleanup_deployment():
     ''' Terminate services, and remove the deployed bins '''
 
+
     host.service_stop('flannel')
+
+    # Stop and remove the flannel bridge
+    down = ['ip', 'link', 'set', 'flannel.1', 'down']
+    delete = ['ip', 'link', 'delete', 'flannel.1']
+    try:
+        subprocess.check_call(down)
+        subprocess.check_call(delete)
+    except subprocess.CalledProcessError:
+        # We failed to stop or remove the flannel interface
+        # Its difficult to discern when this should halt execution... for now
+        # just allow it to fail and leave the interface up. More data will
+        # need to be collected to resolve this particular code path, as it
+        # worked when testing.
+        pass
+
+    # List of files we expect to need to clean up
     files = ['/usr/local/bin/flanneld',
-             '/lib/systemd/system/flannel']
+             '/lib/systemd/system/flannel',
+             '/lib/systemd/system/flannel.service',
+             '/etc/ssl/flannel/client-ca.pem',
+             '/etc/ssl/flannel/client-cert.pem',
+             '/etc/ssl/flannel/client-key.pem',
+             '/var/run/flannel/subnet.env']
+    # if the file exists on disk, remove it to self-cleanup
     for f in files:
         if os.path.exists(f):
+            hookenv.log('Removing {}'.format(f))
             os.remove(f)
