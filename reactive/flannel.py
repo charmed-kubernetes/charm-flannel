@@ -222,8 +222,6 @@ def reset_states_and_redeploy():
 @hook('stop')
 def cleanup_deployment():
     ''' Terminate services, and remove the deployed bins '''
-
-
     host.service_stop('flannel')
 
     # Stop and remove the flannel bridge
@@ -238,7 +236,8 @@ def cleanup_deployment():
         # just allow it to fail and leave the interface up. More data will
         # need to be collected to resolve this particular code path, as it
         # worked when testing.
-        pass
+        hookenv.log('Unable to remove iface flannel.1')
+        hookenv.log('Potential indication that cleanup is not possible')
 
     # List of files we expect to need to clean up
     files = ['/usr/local/bin/flanneld',
