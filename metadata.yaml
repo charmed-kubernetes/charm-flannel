@@ -13,8 +13,8 @@ tags:
 requires:
   etcd:
     interface: etcd
-  host:
-    interface: sdn-plugin
+  cni:
+    interface: kubernetes-cni
     scope: container
 resources:
   flannel:
