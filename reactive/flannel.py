@@ -59,8 +59,8 @@ def install_flannel_binaries():
         check_call(install)
     set_state('flannel.binaries.installed')
 
-
-@when_not('flannel.cni.configured', 'cni.is-worker')
+@when('cni.is-worker')
+@when_not('flannel.cni.configured')
 def configure_cni():
     ''' Set up the flannel cni configuration file. '''
     render('10-flannel.conf', '/etc/cni/net.d/10-flannel.conf', {})
