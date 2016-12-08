@@ -59,6 +59,7 @@ def install_flannel_binaries():
         check_call(install)
     set_state('flannel.binaries.installed')
 
+
 @when('cni.is-worker')
 @when_not('flannel.cni.configured')
 def configure_cni():
