@@ -6,7 +6,8 @@ from subprocess import check_output, check_call, CalledProcessError, STDOUT
 from charms.reactive import set_state, remove_state, when, when_not, hook
 from charms.reactive import when_any
 from charms.templating.jinja2 import render
-from charmhelpers.core.host import service_start, service_stop
+from charmhelpers.core.host import service_start, service_stop, service_restart
+from charmhelpers.core.host import service_running
 from charmhelpers.core.hookenv import log, status_set, resource_get
 from charmhelpers.core.hookenv import config, application_version_set
 
@@ -62,7 +63,7 @@ def install_flannel_binaries():
 
 @when('cni.is-worker')
 @when_not('flannel.cni.configured')
-def configure_cni():
+def configure_cni(cni):
     ''' Set up the flannel cni configuration file. '''
     render('10-flannel.conf', '/etc/cni/net.d/10-flannel.conf', {})
     set_state('flannel.cni.configured')
@@ -94,6 +95,13 @@ def install_flannel_service(etcd):
                'cert_path': ETCD_PATH}
     render('flannel.service', '/lib/systemd/system/flannel.service', context)
     set_state('flannel.service.installed')
+    remove_state('flannel.service.started')
+
+
+@when('config.changed.iface')
+def reconfigure_flannel_service():
+    ''' Handle interface configuration change. '''
+    remove_state('flannel.service.installed')
 
 
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
@@ -115,6 +123,13 @@ def configure_network(etcd):
     cmd += "set /coreos.com/network/config '{0}'".format(data)
     check_call(split(cmd))
     set_state('flannel.network.configured')
+    remove_state('flannel.service.started')
+
+
+@when('config.changed.cidr')
+def reconfigure_network():
+    ''' Trigger the network configuration method. '''
+    remove_state('flannel.network.configured')
 
 
 @when('flannel.binaries.installed', 'flannel.service.installed',
@@ -123,7 +138,10 @@ def configure_network(etcd):
 def start_flannel_service():
     ''' Start the flannel service. '''
     status_set('maintenance', 'Starting flannel service.')
-    service_start('flannel')
+    if service_running('flannel'):
+        service_restart('flannel')
+    else:
+        service_start('flannel')
     set_state('flannel.service.started')
 
 
