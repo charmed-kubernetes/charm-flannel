@@ -182,6 +182,10 @@ def halt_execution():
 def reset_states_and_redeploy():
     ''' Remove state and redeploy '''
     remove_state('flannel.binaries.installed')
+    remove_state('flannel.service.started')
+    remove_state('flannel.version.set')
+    remove_state('flannel.network.configured')
+    remove_state('flannel.service.installed')
 
 
 @hook('stop')
@@ -199,10 +203,15 @@ def cleanup_deployment():
     files = ['/usr/local/bin/flanneld',
              '/lib/systemd/system/flannel',
              '/lib/systemd/system/flannel.service',
+             '/var/run/flannel/subnet.env',
+             '/usr/local/bin/flanneld',
+             '/usr/local/bin/etcdctl',
+             '/opt/cni/bin/flannel',
+             '/opt/cni/bin/bridge',
+             '/opt/cni/bin/host-local',
              ETCD_KEY_PATH,
              ETCD_CERT_PATH,
-             ETCD_CA_PATH,
-             '/var/run/flannel/subnet.env']
+             ETCD_CA_PATH]
     for f in files:
         if os.path.exists(f):
             log('Removing {}'.format(f))
