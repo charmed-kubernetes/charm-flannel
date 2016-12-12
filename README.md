@@ -4,7 +4,7 @@ Flannel is a virtual network that gives a subnet to each host for use with
 container runtimes.
 
 This charm will deploy flannel as a background service, and configure CNI for
-use with flannel, on any principal charm that implement the
+use with flannel, on any principal charm that implements the
 [`kubernetes-cni`](https://github.com/wwwtyro/interface-kubernetes-cni) interface.
 
 
