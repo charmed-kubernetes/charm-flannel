@@ -169,7 +169,7 @@ def set_flannel_version():
 @when_any('cni.is-master', 'flannel.cni.available')
 def ready():
     ''' Indicate that flannel is active. '''
-    status_set('active', 'Flannel is active.')
+    status_set('active', 'Flannel subnet ' + get_flannel_subnet())
 
 
 @when_not('etcd.connected')
@@ -216,3 +216,10 @@ def cleanup_deployment():
         if os.path.exists(f):
             log('Removing {}'.format(f))
             os.remove(f)
+
+
+def get_flannel_subnet():
+    ''' Returns the flannel subnet reserved for this unit '''
+    with open('/run/flannel/subnet.env') as f:
+        raw_data = dict(line.strip().split('=') for line in f)
+    return raw_data['FLANNEL_SUBNET']
