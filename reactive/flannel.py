@@ -175,7 +175,7 @@ def ready():
 @when_not('etcd.connected')
 def halt_execution():
     ''' send a clear message to the user that we are waiting on etcd '''
-    status_set('waiting', 'Waiting for etcd relation.')
+    status_set('blocked', 'Waiting for etcd relation.')
 
 
 @hook('upgrade-charm')
