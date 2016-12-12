@@ -3,16 +3,16 @@
 Flannel is a virtual network that gives a subnet to each host for use with
 container runtimes.
 
-This charm will deploy flannel, render systemd templates, and allow the SDN
-to be related to any principal charm implementing the
-[`sdn-plugin`](https://github.com/juju-solutions/interface-sdn-plugin) interface.
+This charm will deploy flannel as a background service, and configure CNI for
+use with flannel, on any principal charm that implement the
+[`kubernetes-cni`](https://github.com/wwwtyro/interface-kubernetes-cni) interface.
 
 
 ## Usage
 
 The flannel charm is a
 [subordinate](https://jujucharms.com/docs/stable/authors-subordinate-services).
-This charm will require a principal charm that implements the `sdn-plugin`
+This charm will require a principal charm that implements the `kubernetes-cni`
 interface in order to properly deploy.
 
 ```
