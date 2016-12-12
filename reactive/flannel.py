@@ -157,7 +157,6 @@ def set_available(cni):
 @when_not('flannel.version.set')
 def set_flannel_version():
     ''' Surface the currently deployed version of flannel to Juju '''
-    status_set('maintenance', 'Setting flannel version.')
     cmd = 'flanneld -version'
     version = check_output(split(cmd), stderr=STDOUT).decode('utf-8')
     if version:
