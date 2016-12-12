@@ -145,7 +145,7 @@ def start_flannel_service():
     set_state('flannel.service.started')
 
 
-@when('flannel.service.started', 'cni.is-worker')
+@when('flannel.service.started', 'flannel.cni.configured')
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
