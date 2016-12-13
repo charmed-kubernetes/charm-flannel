@@ -5,7 +5,7 @@ container runtimes.
 
 This charm will deploy flannel as a background service, and configure CNI for
 use with flannel, on any principal charm that implements the
-[`kubernetes-cni`](https://github.com/wwwtyro/interface-kubernetes-cni) interface.
+[`kubernetes-cni`](https://github.com/juju-solutions/interface-kubernetes-cni) interface.
 
 
 ## Usage
