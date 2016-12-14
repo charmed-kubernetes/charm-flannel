@@ -1,5 +1,5 @@
 includes:
    - 'interface:etcd'
-   - 'interface:sdn-plugin'
+   - 'interface:kubernetes-cni'
    - 'layer:basic'
 repo: https://github.com/juju-solutions/charm-flannel.git

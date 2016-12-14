@@ -1,254 +1,225 @@
-from charms.reactive import hook
-from charms.reactive import is_state
-from charms.reactive import set_state
-from charms.reactive import remove_state
-from charms.reactive import when
-from charms.reactive import when_not
-
-from charms.templating.jinja2 import render
-from charmhelpers.core import host
-from charmhelpers.core import hookenv
-
-from shlex import split
-
-from subprocess import Popen
-from subprocess import PIPE
-from subprocess import STDOUT
-
-import etcd
-import json
 import os
-import subprocess
+import json
+from shlex import split
+from subprocess import check_output, check_call, CalledProcessError, STDOUT
+
+from charms.reactive import set_state, remove_state, when, when_not, hook
+from charms.reactive import when_any
+from charms.templating.jinja2 import render
+from charmhelpers.core.host import service_start, service_stop, service_restart
+from charmhelpers.core.host import service_running
+from charmhelpers.core.hookenv import log, status_set, resource_get
+from charmhelpers.core.hookenv import config, application_version_set
 
 
-def _get_default_interface():
-    '''Find the default network interface for this host.'''
-    cmd = ['route']
-    # The route command lists the default interfaces.
-    # Destination    Gateway        Genmask      Flags Metric Ref    Use Iface
-    # default        10.128.0.1     0.0.0.0      UG    0      0        0 ens4
-    output = subprocess.check_output(cmd).decode('utf8')
-    # Parse each onen of the lines.
-    for line in output.split('\n'):
-        # When the line contains 'default'.
-        if 'default' in line:
-            # The last column is the network interface.
-            return line.split(' ')[-1]
+ETCD_PATH = '/etc/ssl/flannel'
+ETCD_KEY_PATH = os.path.join(ETCD_PATH, 'client-key.pem')
+ETCD_CERT_PATH = os.path.join(ETCD_PATH, 'client-cert.pem')
+ETCD_CA_PATH = os.path.join(ETCD_PATH, 'client-ca.pem')
 
 
-def _unpack_resource(tarball, output_dir):
-    ''' unpack an arbitrary tarball to an arbitrary path '''
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    command = 'tar -xzf {0} -C {1}'.format(tarball, output_dir)
-    subprocess.check_call(split(command))
-
-
-def _install_files(file_path, output_path):
-    ''' Install files using the unix 'install' command '''
-    command = 'install -v {0} {1}'.format(file_path, output_path)
-    subprocess.check_call(split(command))
-
-
-def _build_context(reldata):
-    ''' Assemble the context dict for use when rendering files'''
-    context = {}
-    # Assume the TLS credentials have been placed
-    if is_state('etcd.tls.available'):
-        cert_path = '/etc/ssl/flannel'
-        reldata.save_client_credentials('{}/client-key.pem'.format(cert_path),
-                                        '{}/client-cert.pem'.format(cert_path),
-                                        '{}/client-ca.pem'.format(cert_path))
-    else:
-        cert_path = None
-    context.update(hookenv.config())
-    if not hookenv.config('iface'):
-        context.update({'iface': _get_default_interface()})
-    context.update({'connection_string': reldata.get_connection_string(),
-                    'cert_path': cert_path})
-
-    return context
-
-
-def _initialize_etcd_with_data(reldata):
-    ''' Before flannel can start up, we need to seed etcd with with configured
-    CIDR. '''
-
-    connection_string = reldata.get_connection_string()
-
-    # Rely on etcd data replication. We only need the first host
-    # out of the HA connection string (if applicable)
-    hosts = connection_string.split(',')
-    host = hosts[0].split(':')[1].lstrip('//')
-    port = hosts[0].split(':')[2]
-
-    tls_required = is_state('etcd.tls.available')
-    if tls_required:
-        cert_path = '/etc/ssl/flannel'
-        key = '{}/client-key.pem'.format(cert_path)
-        cert = '{}/client-cert.pem'.format(cert_path)
-        ca = '{}/client-ca.pem'.format(cert_path)
-        client = etcd.Client(host=host, port=int(port), protocol='https',
-                             cert=(cert, key), ca_cert=ca)
-    else:
-        client = etcd.Client(host=host, port=int(port), protocol='http')
-
-    data = {'Network': hookenv.config('cidr'), 'Backend': {'Type': 'vxlan'}}
-    json_data = json.dumps(data)
-    client.write('/coreos.com/network/config', json_data)
-
-
-def _ingest_network_config():
-    ''' When flannel configures itself on first boot, it generates an
-    environment file (subnet.env).
-
-    return a tuple of subnet, and interface mtu'''
-
-    if not os.path.isfile('/var/run/flannel/subnet.env'):
-        # The host has not fully started, and we have no file.
-        hookenv.log('Did not find expected file: /var/run/flannel/subnet.env')
+@when_not('flannel.binaries.installed')
+def install_flannel_binaries():
+    ''' Unpack the Flannel binaries. '''
+    try:
+        archive = resource_get('flannel')
+    except Exception:
+        message = 'Error fetching the flannel resource.'
+        log(message)
+        status_set('blocked', message)
         return
+    if not archive:
+        message = 'Missing flannel resource.'
+        log(message)
+        status_set('blocked', message)
+        return
+    filesize = os.stat(archive).st_size
+    if filesize < 1000000:
+        message = 'Incomplete flannel resource'
+        log(message)
+        status_set('blocked', message)
+        return
+    status_set('maintenance', 'Unpacking flannel resource.')
+    charm_dir = os.getenv('CHARM_DIR')
+    unpack_path = os.path.join(charm_dir, 'files', 'flannel')
+    os.makedirs(unpack_path, exist_ok=True)
+    cmd = ['tar', 'xfz', archive, '-C', unpack_path]
+    log(cmd)
+    check_call(cmd)
+    apps = [
+        {'name': 'flanneld', 'path': '/usr/local/bin'},
+        {'name': 'etcdctl', 'path': '/usr/local/bin'},
+        {'name': 'flannel', 'path': '/opt/cni/bin'},
+        {'name': 'bridge', 'path': '/opt/cni/bin'},
+        {'name': 'host-local', 'path': '/opt/cni/bin'}
+    ]
+    for app in apps:
+        unpacked = os.path.join(unpack_path, app['name'])
+        app_path = os.path.join(app['path'], app['name'])
+        install = ['install', '-v', '-D', unpacked, app_path]
+        check_call(install)
+    set_state('flannel.binaries.installed')
 
-    with open('/var/run/flannel/subnet.env') as f:
-        flannel_config = f.readlines()
 
-    for f in flannel_config:
-        if 'FLANNEL_SUBNET' in f:
-            value = f.split('=')[-1].strip()
-            subnet = value
-        if 'FLANNEL_MTU' in f:
-            value = f.split('=')[1].strip()
-            mtu = value
-    return (subnet, mtu)
+@when('cni.is-worker')
+@when_not('flannel.cni.configured')
+def configure_cni(cni):
+    ''' Set up the flannel cni configuration file. '''
+    render('10-flannel.conf', '/etc/cni/net.d/10-flannel.conf', {})
+    set_state('flannel.cni.configured')
+
+
+@when('etcd.tls.available')
+@when_not('flannel.etcd.credentials.installed')
+def install_etcd_credentials(etcd):
+    ''' Install the etcd credential files. '''
+    etcd.save_client_credentials(ETCD_KEY_PATH, ETCD_CERT_PATH, ETCD_CA_PATH)
+    set_state('flannel.etcd.credentials.installed')
+
+
+@when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
+      'etcd.available')
+@when_not('flannel.service.installed')
+def install_flannel_service(etcd):
+    ''' Install the flannel service. '''
+    status_set('maintenance', 'Installing flannel service.')
+    default_interface = None
+    cmd = ['route']
+    output = check_output(cmd).decode('utf8')
+    for line in output.split('\n'):
+        if 'default' in line:
+            default_interface = line.split(' ')[-1]
+            break
+    context = {'iface': config('iface') or default_interface,
+               'connection_string': etcd.get_connection_string(),
+               'cert_path': ETCD_PATH}
+    render('flannel.service', '/lib/systemd/system/flannel.service', context)
+    set_state('flannel.service.installed')
+    remove_state('flannel.service.started')
+
+
+@when('config.changed.iface')
+def reconfigure_flannel_service():
+    ''' Handle interface configuration change. '''
+    remove_state('flannel.service.installed')
+
+
+@when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
+      'etcd.available')
+@when_not('flannel.network.configured')
+def configure_network(etcd):
+    ''' Store initial flannel data in etcd. '''
+    data = json.dumps({
+        'Network': config('cidr'),
+        'Backend': {
+            'Type': 'vxlan'
+        }
+    })
+    cmd = "etcdctl "
+    cmd += "--endpoint '{0}' ".format(etcd.get_connection_string())
+    cmd += "--cert-file {0} ".format(ETCD_CERT_PATH)
+    cmd += "--key-file {0} ".format(ETCD_KEY_PATH)
+    cmd += "--ca-file {0} ".format(ETCD_CA_PATH)
+    cmd += "set /coreos.com/network/config '{0}'".format(data)
+    check_call(split(cmd))
+    set_state('flannel.network.configured')
+    remove_state('flannel.service.started')
+
+
+@when('config.changed.cidr')
+def reconfigure_network():
+    ''' Trigger the network configuration method. '''
+    remove_state('flannel.network.configured')
+
+
+@when('flannel.binaries.installed', 'flannel.service.installed',
+      'flannel.network.configured')
+@when_not('flannel.service.started')
+def start_flannel_service():
+    ''' Start the flannel service. '''
+    status_set('maintenance', 'Starting flannel service.')
+    if service_running('flannel'):
+        service_restart('flannel')
+    else:
+        service_start('flannel')
+    set_state('flannel.service.started')
+
+
+@when('cni.connected', 'flannel.service.started', 'flannel.cni.configured')
+@when_not('flannel.cni.available')
+def set_available(cni):
+    ''' Indicate to the CNI provider that we're ready. '''
+    cni.set_available()
+    set_state('flannel.cni.available')
+
+
+@when('flannel.binaries.installed')
+@when_not('flannel.version.set')
+def set_flannel_version():
+    ''' Surface the currently deployed version of flannel to Juju '''
+    cmd = 'flanneld -version'
+    version = check_output(split(cmd), stderr=STDOUT).decode('utf-8')
+    if version:
+        application_version_set(version.split('v')[-1].strip())
+        set_state('flannel.version.set')
+
+
+@when('flannel.service.started')
+@when_any('cni.is-master', 'flannel.cni.available')
+def ready():
+    ''' Indicate that flannel is active. '''
+    status_set('active', 'Flannel subnet ' + get_flannel_subnet())
 
 
 @when_not('etcd.connected')
 def halt_execution():
     ''' send a clear message to the user that we are waiting on etcd '''
-    hookenv.status_set('waiting', 'Waiting for etcd relation.')
-
-
-@when('etcd.available')
-@when_not('flannel.etcd.credentials.placed')
-def place_etcd_tls_credentials(etcd):
-    ''' TLS terminated etcd instances require client credentials. This is
-    a mandatory pre-requisite before we can progress '''
-    # this is likely to run first, save the TLS credentials
-    if is_state('etcd.tls.available'):
-        cert_path = '/etc/ssl/flannel'
-        etcd.save_client_credentials('{}/client-key.pem'.format(cert_path),
-                                     '{}/client-cert.pem'.format(cert_path),
-                                     '{}/client-ca.pem'.format(cert_path))
-
-    set_state('flannel.etcd.credentials.placed')
-
-
-@when_not('flannel.installed')
-def install_flannel():
-    ''' Unpack and install the binary release of flannel '''
-    hookenv.status_set('maintenance', 'Installing flannel.')
-    flannel_package = hookenv.resource_get('flannel')
-
-    if not flannel_package:
-        hookenv.status_set('blocked', 'Missing flannel resource.')
-        return
-
-    # Handle null resource publication, we check if its filesize < 1mb
-    filesize = os.stat(flannel_package).st_size
-    if filesize < 1000000:
-        hookenv.status_set('blocked', 'Incomplete flannel resource.')
-        return
-
-    charm_dir = hookenv.charm_dir()
-
-    # Unpack and install the flannel resource
-    _unpack_resource(flannel_package, '{0}/files/flannel'.format(charm_dir))
-    _install_files('./files/flannel/flanneld', '/usr/local/bin/flanneld')
-
-    set_state('flannel.installed')
-
-
-@when('flannel.installed', 'flannel.etcd.credentials.placed', 'etcd.available')
-@when_not('flannel.sdn.configured')
-def render_flannel_config(etcd):
-    ''' Consume the flannel information, and render the config files to
-    initialize flannel installation '''
-    hookenv.status_set('maintenance', 'Rendering systemd files.')
-    context = _build_context(etcd)
-    render('flannel.service', '/lib/systemd/system/flannel.service', context)
-    _initialize_etcd_with_data(etcd)
-    host.service_start('flannel')
-    set_state('flannel.sdn.configured')
-
-
-@when('flannel.installed')
-def set_flannel_version():
-    ''' Surface the currently deployed version of flannel to Juju '''
-    # flanneld -version
-    # v0.6.1
-    cmd = 'flanneld -version'
-    p = Popen(cmd, shell=True,
-              stdin=PIPE,
-              stdout=PIPE,
-              stderr=STDOUT,
-              close_fds=True)
-    version = p.stdout.read()
-    if version:
-        hookenv.application_version_set(version.split(b'v')[-1].rstrip())
-
-
-@when('flannel.sdn.configured', 'host.connected')
-@when_not('flannel.host.relayed')
-def relay_sdn_configuration(plugin_host):
-    ''' send the flannel interface configuration to the principal unit '''
-    try:
-        subnet, mtu = _ingest_network_config()
-        cidr = hookenv.config('cidr')
-        plugin_host.set_configuration(mtu, subnet, cidr)
-        set_state('flannel.host.relayed')
-        hookenv.status_set('active', 'Flannel subnet {0}'.format(subnet))
-    except TypeError:
-        hookenv.status_set('waiting', 'Flannel is starting up.')
+    status_set('blocked', 'Waiting for etcd relation.')
 
 
 @hook('upgrade-charm')
 def reset_states_and_redeploy():
     ''' Remove state and redeploy '''
-    remove_state('flannel.host.relayed')
-    remove_state('flannel.installed')
+    remove_state('flannel.binaries.installed')
+    remove_state('flannel.service.started')
+    remove_state('flannel.version.set')
+    remove_state('flannel.network.configured')
+    remove_state('flannel.service.installed')
 
 
 @hook('stop')
 def cleanup_deployment():
     ''' Terminate services, and remove the deployed bins '''
-    host.service_stop('flannel')
-
-    # Stop and remove the flannel bridge
-    down = ['ip', 'link', 'set', 'flannel.1', 'down']
-    delete = ['ip', 'link', 'delete', 'flannel.1']
+    service_stop('flannel')
+    down = 'ip link set flannel.1 down'
+    delete = 'ip link delete flannel.1'
     try:
-        subprocess.check_call(down)
-        subprocess.check_call(delete)
-    except subprocess.CalledProcessError:
-        # We failed to stop or remove the flannel interface
-        # Its difficult to discern when this should halt execution... for now
-        # just allow it to fail and leave the interface up. More data will
-        # need to be collected to resolve this particular code path, as it
-        # worked when testing.
-        hookenv.log('Unable to remove iface flannel.1')
-        hookenv.log('Potential indication that cleanup is not possible')
-
-    # List of files we expect to need to clean up
+        check_call(split(down))
+        check_call(split(delete))
+    except CalledProcessError:
+        log('Unable to remove iface flannel.1')
+        log('Potential indication that cleanup is not possible')
     files = ['/usr/local/bin/flanneld',
              '/lib/systemd/system/flannel',
              '/lib/systemd/system/flannel.service',
-             '/etc/ssl/flannel/client-ca.pem',
-             '/etc/ssl/flannel/client-cert.pem',
-             '/etc/ssl/flannel/client-key.pem',
-             '/var/run/flannel/subnet.env']
-    # if the file exists on disk, remove it to self-cleanup
+             '/run/flannel/subnet.env',
+             '/usr/local/bin/flanneld',
+             '/usr/local/bin/etcdctl',
+             '/opt/cni/bin/flannel',
+             '/opt/cni/bin/bridge',
+             '/opt/cni/bin/host-local',
+             '/etc/cni/net.d/10-flannel.conf',
+             ETCD_KEY_PATH,
+             ETCD_CERT_PATH,
+             ETCD_CA_PATH]
     for f in files:
         if os.path.exists(f):
-            hookenv.log('Removing {}'.format(f))
+            log('Removing {}'.format(f))
             os.remove(f)
+
+
+def get_flannel_subnet():
+    ''' Returns the flannel subnet reserved for this unit '''
+    with open('/run/flannel/subnet.env') as f:
+        raw_data = dict(line.strip().split('=') for line in f)
+    return raw_data['FLANNEL_SUBNET']
