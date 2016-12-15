@@ -19,8 +19,10 @@ interface in order to properly deploy.
 juju deploy flannel
 juju deploy etcd
 juju deploy kubernetes-master
-juju add-relation flannel kubernetes-master
+juju deploy kubernetes-worker
 juju add-relation flannel etcd
+juju add-relation flannel kubernetes-master
+juju add-relation flannel kubernetes-worker
 ```
 
 ## Configuration
@@ -36,7 +38,6 @@ route | grep default | head -n 1 | awk {'print $8'}
 establishing networking setup with etcd. Ensure this network range is not active
 on the vlan you're deploying to, as it will cause collisions and odd behavior
 if care is not taken when selecting a good CIDR range to assign to flannel.
-
 
 ## Known Limitations
 
