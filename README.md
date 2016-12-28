@@ -39,6 +39,14 @@ establishing networking setup with etcd. Ensure this network range is not active
 on the vlan you're deploying to, as it will cause collisions and odd behavior
 if care is not taken when selecting a good CIDR range to assign to flannel.
 
+**nagios_context** A string that will be prepended to instance name to set the
+host name in nagios.If you're running multiple environments with the same
+services in them this allows you to differentiate between them. Used by the
+nrpe subordinate charm.
+
+**nagios_servicegroups** The comma-separated list of servicegroups that the
+generated Nagios checks will belong to.
+
 ## Known Limitations
 
 This subordinate does not support being co-located with other deployments of
