@@ -193,7 +193,10 @@ def update_nrpe_config(unused=None):
 @when_any('cni.is-master', 'flannel.cni.available')
 def ready():
     ''' Indicate that flannel is active. '''
-    status_set('active', 'Flannel subnet ' + get_flannel_subnet())
+    try:
+        status_set('active', 'Flannel subnet ' + get_flannel_subnet())
+    except FlannelSubnetNotFound:
+        status_set('waiting', 'Waiting for Flannel')
 
 
 @when_not('etcd.connected')
@@ -245,6 +248,13 @@ def cleanup_deployment():
 
 def get_flannel_subnet():
     ''' Returns the flannel subnet reserved for this unit '''
-    with open('/run/flannel/subnet.env') as f:
-        raw_data = dict(line.strip().split('=') for line in f)
-    return raw_data['FLANNEL_SUBNET']
+    try:
+        with open('/run/flannel/subnet.env') as f:
+            raw_data = dict(line.strip().split('=') for line in f)
+        return raw_data['FLANNEL_SUBNET']
+    except FileNotFoundError as e:
+        raise FlannelSubnetNotFound() from e
+
+
+class FlannelSubnetNotFound(Exception):
+    pass
