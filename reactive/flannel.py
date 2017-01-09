@@ -7,7 +7,7 @@ from charms.reactive import set_state, remove_state, when, when_not, hook
 from charms.reactive import when_any
 from charms.templating.jinja2 import render
 from charmhelpers.core.host import service_start, service_stop, service_restart
-from charmhelpers.core.host import service_running
+from charmhelpers.core.host import service_running, service
 from charmhelpers.core.hookenv import log, status_set, resource_get
 from charmhelpers.core.hookenv import config, application_version_set
 from charmhelpers.contrib.charmsupport import nrpe
@@ -95,6 +95,7 @@ def install_flannel_service(etcd):
                'connection_string': etcd.get_connection_string(),
                'cert_path': ETCD_PATH}
     render('flannel.service', '/lib/systemd/system/flannel.service', context)
+    service('enable', 'flannel')
     set_state('flannel.service.installed')
     remove_state('flannel.service.started')
 
