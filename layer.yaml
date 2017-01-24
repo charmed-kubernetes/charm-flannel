@@ -3,4 +3,5 @@ includes:
    - 'interface:kubernetes-cni'
    - 'interface:nrpe-external-master'
    - 'layer:basic'
+   - 'layer:nagios'
 repo: https://github.com/juju-solutions/charm-flannel.git
