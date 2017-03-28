@@ -151,7 +151,7 @@ def start_flannel_service():
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
-    cni.set_available()
+    cni.set_config(cidr = config('cidr'))
     set_state('flannel.cni.available')
 
 
