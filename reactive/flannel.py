@@ -151,7 +151,7 @@ def start_flannel_service():
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
-    cni.set_available()
+    cni.set_config(cidr=config('cidr'))
     set_state('flannel.cni.available')
 
 
@@ -209,6 +209,7 @@ def halt_execution():
 @hook('upgrade-charm')
 def reset_states_and_redeploy():
     ''' Remove state and redeploy '''
+    remove_state('flannel.cni.available')
     remove_state('flannel.binaries.installed')
     remove_state('flannel.service.started')
     remove_state('flannel.version.set')
