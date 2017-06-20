@@ -118,7 +118,7 @@ def invoke_configure_network(etcd):
         set_state('flannel.network.configured')
         remove_state('flannel.service.started')
     else:
-        status_set('waiting', 'Waiting on etcd coordination.')
+        status_set('waiting', 'Waiting on etcd.')
 
 
 @retry(times=3, delay_secs=20)
