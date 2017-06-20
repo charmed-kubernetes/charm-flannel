@@ -3,6 +3,8 @@ import json
 from shlex import split
 from subprocess import check_output, check_call, CalledProcessError, STDOUT
 
+from charms.flannel.common import retry
+
 from charms.reactive import set_state, remove_state, when, when_not, hook
 from charms.reactive import when_any
 from charms.templating.jinja2 import render
@@ -79,7 +81,7 @@ def install_etcd_credentials(etcd):
 
 
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
-      'etcd.available')
+      'etcd.tls.available')
 @when_not('flannel.service.installed')
 def install_flannel_service(etcd):
     ''' Install the flannel service. '''
@@ -109,8 +111,23 @@ def reconfigure_flannel_service():
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
       'etcd.available')
 @when_not('flannel.network.configured')
+def invoke_configure_network(etcd):
+    ''' invoke network configuration and adjust states '''
+    status_set('maintenance', 'Negotiating flannel network subnet.')
+    if configure_network(etcd):
+        set_state('flannel.network.configured')
+        remove_state('flannel.service.started')
+    else:
+        status_set('waiting', 'Waiting on etcd.')
+
+
+@retry(times=3, delay_secs=20)
 def configure_network(etcd):
-    ''' Store initial flannel data in etcd. '''
+    ''' Store initial flannel data in etcd.
+
+    Returns True if the operation completed successfully.
+
+    '''
     data = json.dumps({
         'Network': config('cidr'),
         'Backend': {
@@ -123,9 +140,14 @@ def configure_network(etcd):
     cmd += "--key-file {0} ".format(ETCD_KEY_PATH)
     cmd += "--ca-file {0} ".format(ETCD_CA_PATH)
     cmd += "set /coreos.com/network/config '{0}'".format(data)
-    check_call(split(cmd))
-    set_state('flannel.network.configured')
-    remove_state('flannel.service.started')
+    try:
+        check_call(split(cmd))
+        return True
+
+    except CalledProcessError:
+        log('Unexpected error configuring network. Assuming etcd not'
+            ' ready. Will retry in 20s')
+        return False
 
 
 @when('config.changed.cidr')
