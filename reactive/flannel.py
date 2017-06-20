@@ -81,7 +81,7 @@ def install_etcd_credentials(etcd):
 
 
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
-      'etcd.available')
+      'etcd.tls.available')
 @when_not('flannel.service.installed')
 def install_flannel_service(etcd):
     ''' Install the flannel service. '''
