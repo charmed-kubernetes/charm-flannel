@@ -113,12 +113,12 @@ def reconfigure_flannel_service():
 @when_not('flannel.network.configured')
 def invoke_configure_network(etcd):
     ''' invoke network configuration and adjust states '''
-    status_set('maintenance', 'Negotiating flannel network subnet')
+    status_set('maintenance', 'Negotiating flannel network subnet.')
     if configure_network(etcd):
         set_state('flannel.network.configured')
         remove_state('flannel.service.started')
     else:
-        status_set('waiting', 'Waiting on etcd Coordination.')
+        status_set('waiting', 'Waiting on etcd coordination.')
 
 
 @retry(times=3, delay_secs=20)
