@@ -4,6 +4,10 @@ description: |
   it is a generic overlay network that can be used as a simple alternative
   to existing software defined networking solutions
 maintainers:
+  - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
+  - George Kraft <george.kraft@canonical.com>
+  - Rye Terrell <rye.terrell@canonical.com>
+  - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
   - Charles Butler <charles.butler@canonical.com>
 series:
   - xenial
