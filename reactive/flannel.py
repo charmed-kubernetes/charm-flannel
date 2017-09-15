@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from shlex import split
 from subprocess import check_output, check_call, CalledProcessError, STDOUT
 
@@ -25,7 +26,8 @@ ETCD_CA_PATH = os.path.join(ETCD_PATH, 'client-ca.pem')
 def install_flannel_binaries():
     ''' Unpack the Flannel binaries. '''
     try:
-        archive = resource_get('flannel')
+        resource_name = 'flannel-{}'.format(arch())
+        archive = resource_get(resource_name)
     except Exception:
         message = 'Error fetching the flannel resource.'
         log(message)
@@ -278,6 +280,15 @@ def get_flannel_subnet():
         return raw_data['FLANNEL_SUBNET']
     except FileNotFoundError as e:
         raise FlannelSubnetNotFound() from e
+
+
+def arch():
+    '''Return the package architecture as a string.'''
+    # Get the package architecture for this system.
+    architecture = check_output(['dpkg', '--print-architecture']).rstrip()
+    # Convert the binary result into a string.
+    architecture = architecture.decode('utf-8')
+    return architecture
 
 
 class FlannelSubnetNotFound(Exception):
