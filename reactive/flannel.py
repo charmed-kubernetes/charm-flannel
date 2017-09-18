@@ -1,6 +1,5 @@
 import os
 import json
-import subprocess
 from shlex import split
 from subprocess import check_output, check_call, CalledProcessError, STDOUT
 
