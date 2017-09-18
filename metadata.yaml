@@ -21,7 +21,11 @@ requires:
     interface: kubernetes-cni
     scope: container
 resources:
-  flannel:
+  flannel-amd64:
     type: file
     filename: flannel.tar.gz
-    description: "A tarball packaged release of flannel"
+    description: "A tarball packaged release of flannel for amd64"
+  flannel-s390x:
+    type: file
+    filename: flannel.tar.gz
+    description: "A tarball packaged release of flannel for s390x"
