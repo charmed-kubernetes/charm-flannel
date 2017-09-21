@@ -5,3 +5,6 @@ includes:
    - 'layer:basic'
    - 'layer:nagios'
 repo: https://github.com/juju-solutions/charm-flannel.git
+options:
+  basic:
+    use_venv: true
