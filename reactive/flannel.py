@@ -55,7 +55,8 @@ def install_flannel_binaries():
         {'name': 'etcdctl', 'path': '/usr/local/bin'},
         {'name': 'flannel', 'path': '/opt/cni/bin'},
         {'name': 'bridge', 'path': '/opt/cni/bin'},
-        {'name': 'host-local', 'path': '/opt/cni/bin'}
+        {'name': 'host-local', 'path': '/opt/cni/bin'},
+        {'name': 'portmap', 'path': '/opt/cni/bin'}
     ]
     for app in apps:
         unpacked = os.path.join(unpack_path, app['name'])
@@ -69,7 +70,7 @@ def install_flannel_binaries():
 @when_not('flannel.cni.configured')
 def configure_cni(cni):
     ''' Set up the flannel cni configuration file. '''
-    render('10-flannel.conf', '/etc/cni/net.d/10-flannel.conf', {})
+    render('10-flannel.conflist', '/etc/cni/net.d/10-flannel.conflist', {})
     set_state('flannel.cni.configured')
 
 
@@ -238,6 +239,12 @@ def reset_states_and_redeploy():
     remove_state('flannel.version.set')
     remove_state('flannel.network.configured')
     remove_state('flannel.service.installed')
+    remove_state('flannel.cni.configured')
+    try:
+        log('Deleting /etc/cni/net.d/10-flannel.conf')
+        os.remove('/etc/cni/net.d/10-flannel.conf')
+    except FileNotFoundError as e:
+        log(str(e))
 
 
 @hook('stop')
@@ -261,7 +268,7 @@ def cleanup_deployment():
              '/opt/cni/bin/flannel',
              '/opt/cni/bin/bridge',
              '/opt/cni/bin/host-local',
-             '/etc/cni/net.d/10-flannel.conf',
+             '/etc/cni/net.d/10-flannel.conflist',
              ETCD_KEY_PATH,
              ETCD_CERT_PATH,
              ETCD_CA_PATH]
