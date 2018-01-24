@@ -12,6 +12,7 @@ from charmhelpers.core.host import service_start, service_stop, service_restart
 from charmhelpers.core.host import service_running, service
 from charmhelpers.core.hookenv import log, status_set, resource_get
 from charmhelpers.core.hookenv import config, application_version_set
+from charmhelpers.core.hookenv import network_get
 from charmhelpers.contrib.charmsupport import nrpe
 
 
@@ -82,20 +83,50 @@ def install_etcd_credentials(etcd):
     set_state('flannel.etcd.credentials.installed')
 
 
-@when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
-      'etcd.tls.available')
-@when_not('flannel.service.installed')
-def install_flannel_service(etcd):
-    ''' Install the flannel service. '''
-    status_set('maintenance', 'Installing flannel service.')
+def default_route_interface():
+    ''' Returns the network interface of the system's default route '''
     default_interface = None
     cmd = ['route']
     output = check_output(cmd).decode('utf8')
     for line in output.split('\n'):
         if 'default' in line:
             default_interface = line.split(' ')[-1]
-            break
-    context = {'iface': config('iface') or default_interface,
+            return default_interface
+
+
+def get_bind_address_interface():
+    ''' Returns a non-fan bind-address interface for the cni endpoint.
+    Falls back to default_route_interface() if bind-address is not available.
+    '''
+    try:
+        data = network_get('cni')
+    except NotImplementedError:
+        # Juju < 2.1
+        return default_route_interface()
+
+    if 'bind-addresses' not in data:
+        # Juju < 2.3
+        return default_route_interface()
+
+    for bind_address in data['bind-addresses']:
+        if bind_address['interfacename'].startswith('fan-'):
+            continue
+        return bind_address['interfacename']
+
+    # If we made it here, we didn't find a non-fan CNI bind-address, which is
+    # unexpected. Let's log a message and play it safe.
+    log('Could not find a non-fan bind-address. Using fallback interface.')
+    return default_route_interface()
+
+
+@when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
+      'etcd.tls.available')
+@when_not('flannel.service.installed')
+def install_flannel_service(etcd):
+    ''' Install the flannel service. '''
+    status_set('maintenance', 'Installing flannel service.')
+    iface = config('iface') or get_bind_address_interface()
+    context = {'iface': iface,
                'connection_string': etcd.get_connection_string(),
                'cert_path': ETCD_PATH}
     render('flannel.service', '/lib/systemd/system/flannel.service', context)
