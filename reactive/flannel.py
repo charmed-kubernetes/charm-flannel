@@ -14,6 +14,7 @@ from charmhelpers.core.hookenv import log, status_set, resource_get
 from charmhelpers.core.hookenv import config, application_version_set
 from charmhelpers.core.hookenv import network_get
 from charmhelpers.contrib.charmsupport import nrpe
+from charms.reactive.helpers import data_changed
 
 
 ETCD_PATH = '/etc/ssl/flannel'
@@ -139,6 +140,12 @@ def install_flannel_service(etcd):
 def reconfigure_flannel_service():
     ''' Handle interface configuration change. '''
     remove_state('flannel.service.installed')
+
+
+@when('etcd.available')
+def etcd_changed(etcd):
+    if data_changed('flannel_etcd_connections', etcd.get_connection_string()):
+        remove_state('flannel.service.installed')
 
 
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
