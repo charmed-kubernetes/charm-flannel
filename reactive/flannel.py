@@ -126,6 +126,8 @@ def get_bind_address_interface():
 def install_flannel_service(etcd):
     ''' Install the flannel service. '''
     status_set('maintenance', 'Installing flannel service.')
+    # keep track of our etcd conn string so we can detect when it changes later
+    data_changed('flannel_etcd_connections', etcd.get_connection_string())
     iface = config('iface') or get_bind_address_interface()
     context = {'iface': iface,
                'connection_string': etcd.get_connection_string(),
@@ -142,7 +144,7 @@ def reconfigure_flannel_service():
     remove_state('flannel.service.installed')
 
 
-@when('etcd.available')
+@when('etcd.available', 'flannel.service.installed')
 def etcd_changed(etcd):
     if data_changed('flannel_etcd_connections', etcd.get_connection_string()):
         remove_state('flannel.service.installed')
