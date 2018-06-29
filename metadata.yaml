@@ -11,6 +11,7 @@ maintainers:
   - Charles Butler <Chuck@dasroot.net>
 series:
   - xenial
+  - bionic
 subordinate: true
 tags:
   - networking
