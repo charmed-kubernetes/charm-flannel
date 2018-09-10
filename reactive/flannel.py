@@ -211,7 +211,8 @@ def start_flannel_service():
     set_state('flannel.service.started')
 
 
-@when('cni.connected', 'flannel.service.started', 'flannel.cni.configured')
+@when('cni.connected', 'flannel.service.started')
+@when_any('flannel.cni.configured', 'cni.is-master')
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
@@ -255,7 +256,7 @@ def update_nrpe_config(unused=None):
 
 
 @when('flannel.service.started')
-@when_any('cni.is-master', 'flannel.cni.available')
+@when('flannel.cni.available')
 def ready():
     ''' Indicate that flannel is active. '''
     try:
