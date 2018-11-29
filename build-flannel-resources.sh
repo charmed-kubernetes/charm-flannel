@@ -47,7 +47,7 @@ mkdir "$temp_dir"
       echo "build script commit: $build_script_commit" >> BUILD_INFO
       cp "$temp_dir"/etcd/bin/etcdctl .
       cp "$temp_dir"/flannel/dist/flanneld-$arch ./flanneld
-      tar -caf "$temp_dir/flannel-$arch-$FLANNEL_VERSION.tar.gz" .
+      tar -caf "$temp_dir/flannel-$arch.tar.gz" .
     )
   done
 )
