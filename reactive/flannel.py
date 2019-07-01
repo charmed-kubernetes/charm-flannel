@@ -144,6 +144,8 @@ def reconfigure_flannel_service():
 def etcd_changed(etcd):
     if data_changed('flannel_etcd_connections', etcd.get_connection_string()):
         remove_state('flannel.service.installed')
+    if data_changed('flannel_etcd_client_cert', etcd.get_client_credentials()):
+        remove_state('flannel.service.installed')
 
 
 @when('flannel.binaries.installed', 'flannel.etcd.credentials.installed',
