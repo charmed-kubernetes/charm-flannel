@@ -147,7 +147,9 @@ def etcd_changed(etcd):
     if data_changed('flannel_etcd_connections', etcd.get_connection_string()):
         remove_state('flannel.service.installed')
     if data_changed('flannel_etcd_client_cert', etcd.get_client_credentials()):
-        install_etcd_credentials(etcd)
+        etcd.save_client_credentials(ETCD_KEY_PATH,
+                                     ETCD_CERT_PATH,
+                                     ETCD_CA_PATH)
         remove_state('flannel.service.installed')
 
 
