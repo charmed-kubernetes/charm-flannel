@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eux
 
-FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.10.0"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.11.0"}
 ETCD_VERSION=${ETCD_VERSION:-"v2.3.7"}
 
 ARCH=${ARCH:-"amd64 arm64 s390x"}
