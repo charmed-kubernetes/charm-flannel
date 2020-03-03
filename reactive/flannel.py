@@ -219,7 +219,7 @@ def start_flannel_service():
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
-    cni.set_config(cidr=config('cidr'))
+    cni.set_config(cidr=config('cidr'), cni_conf_file='10-flannel.conflist')
     set_state('flannel.cni.available')
 
 
