@@ -12,6 +12,7 @@ maintainers:
 series:
   - xenial
   - bionic
+  - focal
 subordinate: true
 tags:
   - networking
