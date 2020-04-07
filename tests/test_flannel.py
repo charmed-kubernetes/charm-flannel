@@ -13,3 +13,9 @@ def test_set_available():
         cni_conf_file='10-flannel.conflist'
     )
     set_state.assert_called_once_with('flannel.cni.available')
+
+
+def test_series_upgrade():
+    assert flannel.status_set.call_count == 0
+    flannel.pre_series_upgrade()
+    assert flannel.status_set.call_count == 1

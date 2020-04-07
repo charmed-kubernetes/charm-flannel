@@ -291,6 +291,11 @@ def reset_states_and_redeploy():
         log(str(e))
 
 
+@hook('pre-series-upgrade')
+def pre_series_upgrade():
+    status_set('blocked', 'Series upgrade in progress')
+
+
 @hook('stop')
 def cleanup_deployment():
     ''' Terminate services, and remove the deployed bins '''
