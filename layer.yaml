@@ -5,6 +5,7 @@ includes:
    - 'layer:basic'
    - 'layer:debug'
    - 'layer:nagios'
+   - 'layer:status'
 repo: https://github.com/juju-solutions/charm-flannel.git
 options:
   basic:
