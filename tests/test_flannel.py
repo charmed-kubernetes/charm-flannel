@@ -16,6 +16,6 @@ def test_set_available():
 
 
 def test_series_upgrade():
-    assert flannel.status_set.call_count == 0
+    assert flannel.status.blocked.call_count == 0
     flannel.pre_series_upgrade()
-    assert flannel.status_set.call_count == 1
+    assert flannel.status.blocked.call_count == 1
