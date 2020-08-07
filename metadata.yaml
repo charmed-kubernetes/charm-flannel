@@ -10,9 +10,9 @@ maintainers:
   - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
   - Charles Butler <Chuck@dasroot.net>
 series:
-  - xenial
-  - bionic
   - focal
+  - bionic
+  - xenial
 subordinate: true
 tags:
   - networking
