@@ -9,3 +9,11 @@ use with flannel, on any principal charm that implements the
 
 This charm is maintained along with the components of Charmed Kubernetes. For full information,
 please visit the [official Charmed Kubernetes docs](https://www.ubuntu.com/kubernetes/docs/charm-flannel).
+
+# Developers
+
+## Building the charm
+
+```
+make charm
+```
