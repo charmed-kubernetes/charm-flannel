@@ -175,12 +175,22 @@ def configure_network(etcd):
     Returns True if the operation completed successfully.
 
     '''
-    data = json.dumps({
+    flannel_config = {
         'Network': config('cidr'),
         'Backend': {
             'Type': 'vxlan'
         }
-    })
+    }
+
+    vni = config('vni')
+    if vni:
+        flannel_config['Backend']['VNI'] = vni
+
+    port = config('port')
+    if port:
+        flannel_config['Backend']['Port'] = port
+
+    data = json.dumps(flannel_config)
     cmd = "etcdctl "
     cmd += "--endpoint '{0}' ".format(etcd.get_connection_string())
     cmd += "--cert-file {0} ".format(ETCD_CERT_PATH)

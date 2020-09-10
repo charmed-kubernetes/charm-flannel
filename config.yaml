@@ -10,3 +10,13 @@ options:
     default: 10.1.0.0/16
     description: |
       Network CIDR to assign to Flannel
+  port:
+    type: int
+    default: 0
+    description: |
+      Network port to use for Flannel
+  vni:
+    type: int
+    default: 0
+    description: |
+      VXLAN network id to assign to Flannel
