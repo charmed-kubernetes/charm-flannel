@@ -10,3 +10,5 @@ repo: https://github.com/juju-solutions/charm-flannel.git
 options:
   basic:
     use_venv: true
+    packages:
+      - net-tools
