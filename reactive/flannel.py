@@ -207,7 +207,7 @@ def configure_network(etcd):
         return False
 
 
-@when('config.changed.cidr', 'config.changed.port', 'config.changed.vni')
+@when_any('config.changed.cidr', 'config.changed.port', 'config.changed.vni')
 def reconfigure_network():
     ''' Trigger the network configuration method. '''
     remove_state('flannel.network.configured')
