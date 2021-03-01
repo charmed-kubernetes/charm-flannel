@@ -175,12 +175,22 @@ def configure_network(etcd):
     Returns True if the operation completed successfully.
 
     '''
-    data = json.dumps({
+    flannel_config = {
         'Network': config('cidr'),
         'Backend': {
             'Type': 'vxlan'
         }
-    })
+    }
+
+    vni = config('vni')
+    if vni:
+        flannel_config['Backend']['VNI'] = vni
+
+    port = config('port')
+    if port:
+        flannel_config['Backend']['Port'] = port
+
+    data = json.dumps(flannel_config)
     cmd = "etcdctl "
     cmd += "--endpoint '{0}' ".format(etcd.get_connection_string())
     cmd += "--cert-file {0} ".format(ETCD_CERT_PATH)
@@ -197,7 +207,7 @@ def configure_network(etcd):
         return False
 
 
-@when('config.changed.cidr')
+@when_any('config.changed.cidr', 'config.changed.port', 'config.changed.vni')
 def reconfigure_network():
     ''' Trigger the network configuration method. '''
     remove_state('flannel.network.configured')
