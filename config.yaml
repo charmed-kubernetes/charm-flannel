@@ -20,3 +20,8 @@ options:
     default: 0
     description: |
       VXLAN network id to assign to Flannel
+  subnet-len:
+    type: int
+    default: 24
+    description: |
+      The size of the subnet allocated to each host.
