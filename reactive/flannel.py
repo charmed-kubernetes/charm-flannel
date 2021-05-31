@@ -10,7 +10,7 @@ from charms.reactive import when_any
 from charms.templating.jinja2 import render
 from charmhelpers.core.host import service_start, service_stop, service_restart
 from charmhelpers.core.host import service_running, service
-from charmhelpers.core.hookenv import log, resource_get
+from charmhelpers.core.hookenv import log, resource_get, WARNING
 from charmhelpers.core.hookenv import config, application_version_set
 from charmhelpers.core.hookenv import network_get
 from charmhelpers.contrib.charmsupport import nrpe
@@ -190,24 +190,40 @@ def configure_network(etcd):
     if port:
         flannel_config['Backend']['Port'] = port
 
-    data = json.dumps(flannel_config)
-    cmd = "etcdctl "
-    cmd += "--endpoint '{0}' ".format(etcd.get_connection_string())
-    cmd += "--cert-file {0} ".format(ETCD_CERT_PATH)
-    cmd += "--key-file {0} ".format(ETCD_KEY_PATH)
-    cmd += "--ca-file {0} ".format(ETCD_CA_PATH)
-    cmd += "set /coreos.com/network/config '{0}'".format(data)
-    try:
-        check_call(split(cmd))
-        return True
+    output = run_etcdctl(etcd, "get", "/coreos.com/network/config")
+    current_config = json.loads(output)
+    # Check if subnet-len changed in comparison with what's stored in etcd,
+    # but more important than that it's to check for a not set SubnetLen when
+    # the subnet-len configured is 24 which will be the case for environments
+    # upgrading the charm and in those situations we don't want to add
+    # disruption restating flannel without need.
+    if current_config.get("SubnetLen") != config("subnet-len") \
+        and not (current_config.get("SubnetLen") is None
+                 and config("subnet-len") == 24):
+        # the SubnetLen stored in etcd is different from the one that's
+        # configured by the user via 'juju config', so the cni0 bridge is
+        # deleted to make flannel recreate on restart.
+        flannel_config['SubnetLen'] = config('subnet-len')
+        try:
+            check_call(["ip", "link", "set", "cni0", "down"])
+            check_call(["brctl", "delbr", "cni0"])
+        except CalledProcessError as ex:
+            log("Error when deleting cni0 bridge: {0}".format(ex),
+                level=WARNING)
+        remove_state('flannel.service.started')
 
+    try:
+        run_etcdctl(etcd, "set", "/coreos.com/network/config",
+                    json.dumps(flannel_config))
+        return True
     except CalledProcessError:
         log('Unexpected error configuring network. Assuming etcd not'
             ' ready. Will retry in 20s')
         return False
 
 
-@when_any('config.changed.cidr', 'config.changed.port', 'config.changed.vni')
+@when_any('config.changed.cidr', 'config.changed.port',
+          'config.changed.subnet-len', 'config.changed.vni')
 def reconfigure_network():
     ''' Trigger the network configuration method. '''
     remove_state('flannel.network.configured')
@@ -334,6 +350,19 @@ def cleanup_deployment():
         if os.path.exists(f):
             log('Removing {}'.format(f))
             os.remove(f)
+
+
+def run_etcdctl(etcd, *args):
+    """Run etcdctl.
+
+    :returns: command's stdout"""
+    cmd = ["etcdctl",
+           "--endpoint", etcd.get_connection_string(),
+           "--cert-file", ETCD_CERT_PATH,
+           "--key-file", ETCD_KEY_PATH,
+           "--ca-file", ETCD_CA_PATH]
+    cmd += args
+    return check_output(cmd)
 
 
 def get_flannel_subnet():
