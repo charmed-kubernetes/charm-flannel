@@ -14,7 +14,7 @@ fi
 
 function generate::attachments
 {
-    ./build-flannel-resources.sh
+    ./script/build-resources
     for resource in *.tar.gz; do
         charm attach cs:~"$NAMESPACE"/"$CHARM" --channel unpublished "${resource%%.*}"="$resource"
     done
