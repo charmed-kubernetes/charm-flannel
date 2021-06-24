@@ -15,5 +15,11 @@ please visit the [official Charmed Kubernetes docs](https://www.ubuntu.com/kuber
 ## Building the charm
 
 ```
-make charm
+charm build -o <build-dir>
+```
+
+## Building the flannel resources
+
+```
+./build-flannel-resources.sh
 ```
