@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 from ipaddress import ip_address, ip_network
 from time import sleep
@@ -72,7 +71,7 @@ async def validate_flannel_cidr_network(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, flannel_resource_name, flannel_resource):
+async def test_build_and_deploy(ops_test, flannel_resource):
     """Build and deploy Flannel in bundle."""
     flannel_charm = await ops_test.build_charm(".")
 
@@ -82,13 +81,11 @@ async def test_build_and_deploy(ops_test, flannel_resource_name, flannel_resourc
     rc, stdout, stderr = await ops_test.run(
         "juju",
         "deploy",
-        "-m",
-        ops_test.model_full_name,
+        "-m", ops_test.model_full_name,
         flannel_charm,
-        "--resource",
-        f"{flannel_resource_name}={flannel_resource}",  # noqa: E999
+        "--resource",  flannel_resource
     )
-    assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"
+    assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"  # noqa: E999
 
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
@@ -124,12 +121,7 @@ async def test_change_cidr_network(ops_test):
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     k8s_worker = ops_test.model.applications["kubernetes-worker"].units[0]
     rc, stdout, stderr = await ops_test.run(
-        "ssh",
-        "-i", os.path.expanduser("~/.local/share/juju/ssh/juju_id_rsa"),
-        "-o", "StrictHostKeyChecking=no",
-        "-q",
-        "{}@{}".format("ubuntu", k8s_worker.private_address),
-        "sudo reboot now"
+        "juju", "ssh", f"{k8s_worker.name}", "--", "sudo reboot now"
     )
     assert rc in [0, 255], (f"Failed to restart kubernetes-worker with "
                             f"resource: {stderr or stdout}")
