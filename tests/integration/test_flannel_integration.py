@@ -79,7 +79,7 @@ async def test_build_and_deploy(ops_test, flannel_resource_name, flannel_resourc
     # Work around libjuju not handling local file resources by manually
     # pre-deploying the charm w/ resource via the CLI. See
     # https://github.com/juju/python-libjuju/issues/223
-    rc, stdout, stderr = await ops_test._run(
+    rc, stdout, stderr = await ops_test.run(
         "juju",
         "deploy",
         "-m",
