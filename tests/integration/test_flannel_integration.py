@@ -72,7 +72,7 @@ async def validate_flannel_cidr_network(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, flannel_resource_name, flannel_resource):
+async def test_build_and_deploy(ops_test, flannel_resource):
     """Build and deploy Flannel in bundle."""
     flannel_charm = await ops_test.build_charm(".")
 
@@ -82,11 +82,9 @@ async def test_build_and_deploy(ops_test, flannel_resource_name, flannel_resourc
     rc, stdout, stderr = await ops_test.run(
         "juju",
         "deploy",
-        "-m",
-        ops_test.model_full_name,
+        "-m", ops_test.model_full_name,
         flannel_charm,
-        "--resource",
-        f"{flannel_resource_name}={flannel_resource}",  # noqa: E999
+        "--resource", flannel_resource,
     )
     assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"
 
@@ -118,7 +116,8 @@ async def test_change_cidr_network(ops_test):
     """Test configuration change."""
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
-    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
+    await ops_test.model.wait_for_idle(wait_for_active=True, timeout=20 * 60,
+                                       idle_period=60)
 
     # note (rgildein): There is need to restart kubernetes-worker machine.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
@@ -133,6 +132,6 @@ async def test_change_cidr_network(ops_test):
     )
     assert rc in [0, 255], (f"Failed to restart kubernetes-worker with "
                             f"resource: {stderr or stdout}")
-    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
-
+    await ops_test.model.wait_for_idle(wait_for_active=True, timeout=20 * 60,
+                                       idle_period=60)
     await validate_flannel_cidr_network(ops_test)
