@@ -85,7 +85,7 @@ async def test_build_and_deploy(ops_test, flannel_resource):
         flannel_charm,
         "--resource", flannel_resource,
     )
-    assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"
+    assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"  # noqa: E999
 
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
