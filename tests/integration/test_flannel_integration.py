@@ -123,7 +123,7 @@ async def test_change_cidr_network(ops_test):
     # note (rgildein): There is need to restart kubernetes-worker machine.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     k8s_worker = ops_test.model.applications["kubernetes-worker"].units[0]
-    rc, stdout, stderr = await ops_test._run(
+    rc, stdout, stderr = await ops_test.run(
         "ssh",
         "-i", os.path.expanduser("~/.local/share/juju/ssh/juju_id_rsa"),
         "-o", "StrictHostKeyChecking=no",
