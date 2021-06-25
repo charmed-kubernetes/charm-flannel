@@ -115,16 +115,21 @@ async def test_change_cidr_network(ops_test):
     """Test configuration change."""
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
-    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
+    rc, stdout, stderr = await ops_test.run(
+        "juju", "run", "-m", ops_test.model_full_name, "--application", "flannel",
+        "--", "hooks/config-changed"
+    )
+    assert rc == 0, f"Failed to run hook with resource: {stderr or stdout}"
 
     # note (rgildein): There is need to restart kubernetes-worker machine.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     k8s_worker = ops_test.model.applications["kubernetes-worker"].units[0]
     rc, stdout, stderr = await ops_test.run(
-        "juju", "ssh", f"{k8s_worker.name}", "--", "sudo reboot now"
+        "juju", "ssh", "-m", ops_test.model_full_name, f"{k8s_worker.name}",
+        "--", "sudo reboot now"
     )
     assert rc in [0, 255], (f"Failed to restart kubernetes-worker with "
                             f"resource: {stderr or stdout}")
-    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
 
+    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
     await validate_flannel_cidr_network(ops_test)
