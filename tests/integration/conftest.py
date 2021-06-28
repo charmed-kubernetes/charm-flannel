@@ -22,6 +22,7 @@ def flannel_resource(pytestconfig):
     version = pytestconfig.getoption("--flannel-version")
     path = pytestconfig.getoption("--flannel-resource")
     if not path.exists():
-        raise FileNotFoundError(path)
+        raise FileNotFoundError("Missing resource, please provide via"
+                                "--flannel-resource option or at {}".format(path))
 
     return f"flannel-{version}={path}"  # noqa: E999
