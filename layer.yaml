@@ -6,6 +6,7 @@ includes:
    - 'layer:debug'
    - 'layer:nagios'
    - 'layer:status'
+   - 'layer:kubernetes-common'
 repo: https://github.com/juju-solutions/charm-flannel.git
 options:
   basic:
