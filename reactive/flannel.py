@@ -66,7 +66,7 @@ def install_flannel_binaries():
     set_state('flannel.binaries.installed')
 
 
-@when('cni.is-worker')
+@when('cni.connected')
 @when_not('flannel.cni.configured')
 def configure_cni(cni):
     ''' Set up the flannel cni configuration file. '''
@@ -226,8 +226,7 @@ def start_flannel_service():
     set_state('flannel.service.started')
 
 
-@when('cni.connected', 'flannel.service.started')
-@when_any('flannel.cni.configured', 'cni.is-master')
+@when('cni.connected', 'flannel.service.started', 'flannel.cni.configured')
 @when_not('flannel.cni.available')
 def set_available(cni):
     ''' Indicate to the CNI provider that we're ready. '''
