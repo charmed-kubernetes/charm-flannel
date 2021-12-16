@@ -74,27 +74,23 @@ async def validate_flannel_cidr_network(ops_test):
 async def test_build_and_deploy(ops_test, flannel_resource):
     """Build and deploy Flannel in bundle."""
     flannel_charm = await ops_test.build_charm(".")
-
-    # Work around libjuju not handling local file resources by manually
-    # pre-deploying the charm w/ resource via the CLI. See
-    # https://github.com/juju/python-libjuju/issues/223
-    rc, stdout, stderr = await ops_test.run(
-        "juju",
-        "deploy",
-        "-m", ops_test.model_full_name,
-        flannel_charm,
-        "--resource", flannel_resource,
-    )
-    assert rc == 0, f"Failed to deploy with resource: {stderr or stdout}"  # noqa: E999
-
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
         master_charm=flannel_charm,
         series="focal",
-        # flannel_resource_name=flannel_resource_name,  # This doesn't work currently
-        # flannel_resource=flannel_resource,  # This doesn't work currently
+        flannel_resource="{0}: {1}".format(*flannel_resource),
     )
     await ops_test.model.deploy(bundle)
+    # NOTE (rgildein): resource attach is not implemented in python-libjuju
+    # await ops_test.model.applications["flannel"].attach(*flannel_resource)
+    rc, stdout, stderr = await ops_test.run(
+        "juju",
+        "attach",
+        "-m", ops_test.model_full_name,
+        "flannel",
+        "{0}={1}".format(*flannel_resource),
+    )
+    assert rc == 0, f"Failed to attach resource: {stderr or stdout}"  # noqa: E999
     await ops_test.model.wait_for_idle(status="active", timeout=60 * 60, idle_period=60)
 
 
@@ -123,5 +119,5 @@ async def test_change_cidr_network(ops_test):
     assert rc in [0, 255], (f"Failed to restart kubernetes-worker with "
                             f"resource: {stderr or stdout}")
 
-    await ops_test.model.wait_for_idle(wait_for_active=True, idle_period=60)
+    await ops_test.model.wait_for_idle(status="active", timeout=10 * 60, idle_period=60)
     await validate_flannel_cidr_network(ops_test)

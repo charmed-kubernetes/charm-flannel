@@ -27,9 +27,8 @@ applications:
     - '0'
   flannel:
     charm: {{ master_charm }}
-    # This is currently not working due to https://github.com/juju/python-libjuju/issues/223
-    # resources:
-    #  {{ flannel_resource_name }}: {{ flannel_resource }}
+    resources:
+      {{ flannel_resource }}
   kubernetes-master:
     charm: ch:containers-kubernetes-master
     channel: edge
