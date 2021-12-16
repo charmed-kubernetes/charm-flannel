@@ -95,15 +95,7 @@ async def test_build_and_deploy(ops_test, flannel_resource):
         # flannel_resource=flannel_resource,  # This doesn't work currently
     )
     await ops_test.model.deploy(bundle)
-
-    # This configuration is needed due testing on top of LXD containers.
-    # https://bugs.launchpad.net/charm-kubernetes-worker/+bug/1903566
-    await ops_test.model.applications["kubernetes-worker"].set_config({
-        "kubelet-extra-config": "{protectKernelDefaults: false}"
-    })
-
-    await ops_test.model.wait_for_idle(wait_for_active=True, timeout=60 * 60,
-                                       idle_period=60)
+    await ops_test.model.wait_for_idle(status="active", timeout=60 * 60, idle_period=60)
 
 
 async def test_status_messages(ops_test):

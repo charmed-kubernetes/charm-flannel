@@ -9,16 +9,16 @@ machines:
     series: {{ series }}
 applications:
   containerd:
-    charm: containers-containerd
+    charm: ch:containers-containerd
     channel: edge
   easyrsa:
-    charm: containers-easyrsa
+    charm: ch:containers-easyrsa
     channel: edge
     num_units: 1
     to:
     - '1'
   etcd:
-    charm: etcd
+    charm: ch:etcd
     channel: edge
     num_units: 1
     options:
@@ -31,7 +31,7 @@ applications:
     # resources:
     #  {{ flannel_resource_name }}: {{ flannel_resource }}
   kubernetes-master:
-    charm: containers-kubernetes-master
+    charm: ch:containers-kubernetes-master
     channel: edge
     constraints: cores=4 mem=4G root-disk=16G
     expose: true
@@ -41,7 +41,7 @@ applications:
     to:
     - '0'
   kubernetes-worker:
-    charm: containers-kubernetes-worker
+    charm: ch:containers-kubernetes-worker
     channel: edge
     constraints: cores=4 mem=4G root-disk=16G
     expose: true
