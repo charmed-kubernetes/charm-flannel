@@ -139,5 +139,6 @@ async def test_change_cidr_network(ops_test):
                          .format(name=k8s_worker.name, err=stderr or stdout))
         log.info("Rebooting complete {name}: uptime {err}"
                  .format(name=k8s_worker.name, err=stderr or stdout))
+
     log.info("Stability reached after reboot")
     await validate_flannel_cidr_network(ops_test)
