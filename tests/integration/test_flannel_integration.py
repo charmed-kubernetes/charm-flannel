@@ -112,12 +112,12 @@ async def test_change_cidr_network(ops_test):
     # note (rgildein): There is need to restart kubernetes-worker machine.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     k8s_worker = ops_test.model.applications["kubernetes-worker"].units[0]
-    rc, stdout, stderr = await ops_test.run(
-        "juju", "ssh", "-m", ops_test.model_full_name, f"{k8s_worker.name}",
-        "--", "sudo reboot now"
+    rc, stdout, stderr = await ops_test.juju(
+        "ssh", "-m", ops_test.model_full_name, f"{k8s_worker.name}",
+        "--", "sudo su root -c '(sleep 5; reboot) &'"
     )
-    assert rc in [0, 255], (f"Failed to restart kubernetes-worker with "
-                            f"resource: {stderr or stdout}")
+    assert rc == 0, ("Failed to restart kubernetes-worker with "
+                     f"resource: {stderr or stdout}")
 
     await ops_test.model.wait_for_idle(status="active", timeout=10 * 60, idle_period=60)
     await validate_flannel_cidr_network(ops_test)
