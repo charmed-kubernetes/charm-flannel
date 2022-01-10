@@ -31,11 +31,12 @@ jobs:
         with:
           python-version: 3.9
       - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@master
+        uses: charmed-kubernetes/actions-operator@main
         with:
           provider: lxd
       - name: Install docker
-        run: sudo snap install docker
+        # using channel candidate due https://github.com/docker-snap/docker-snap/issues/45
+        run: sudo snap install docker --candidate
       - name: Build flannel resources
         run: ARCH=amd64 sudo ./build-flannel-resources.sh
       - name: Run integration test
