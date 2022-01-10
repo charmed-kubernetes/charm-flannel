@@ -31,7 +31,7 @@ async def setup_resources(ops_test, tmpdir):
         log.info("Build Resources...")
         build_script = cwd / "build-flannel-resources.sh"
         rc, stdout, stderr = await ops_test.run(
-            *shlex.split("sudo " + build_script), cwd=tmpdir, check=False
+            *shlex.split("sudo {}".format(build_script)), cwd=tmpdir, check=False
         )
         if rc != 0:
             err = (stderr or stdout).strip()
