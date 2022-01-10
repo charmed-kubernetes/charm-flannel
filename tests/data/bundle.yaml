@@ -28,7 +28,9 @@ applications:
   flannel:
     charm: {{ master_charm }}
     resources:
-      {{ flannel_resource }}
+      flannel-amd64: {{flannel_amd64|default("0")}}
+      flannel-arm64: {{flannel_arm64|default("0")}}
+      flannel-s390x: {{flannel_s390x|default("0")}}
   kubernetes-master:
     charm: ch:containers-kubernetes-master
     channel: edge

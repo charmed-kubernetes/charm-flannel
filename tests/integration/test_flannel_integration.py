@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import shlex
 from ipaddress import ip_address, ip_network
 from time import sleep
 
@@ -75,27 +76,29 @@ async def validate_flannel_cidr_network(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, flannel_resource):
+async def test_build_and_deploy(ops_test, setup_resources):
     """Build and deploy Flannel in bundle."""
-    flannel_charm = await ops_test.build_charm(".")
+    log.info("Build Charm...")
+    charm = await ops_test.build_charm(".")
+
+    log.info("Build Bundle...")
+    charm_resources = {
+        rsc.name.replace("-", "_").replace('.tar.gz', ''): rsc
+        for rsc in setup_resources
+    }
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
-        master_charm=flannel_charm,
+        master_charm=charm,
         series="focal",
-        flannel_resource="{0}: {1}".format(*flannel_resource),
+        **charm_resources
     )
-    await ops_test.model.deploy(bundle)
-    # NOTE (rgildein): resource attach is not implemented in python-libjuju
-    # await ops_test.model.applications["flannel"].attach(*flannel_resource)
-    rc, stdout, stderr = await ops_test.run(
-        "juju",
-        "attach",
-        "-m", ops_test.model_full_name,
-        "flannel",
-        "{0}={1}".format(*flannel_resource),
-    )
-    assert rc == 0, "Failed to attach resource: " \
-                    "{err}".format(err=stderr or stdout)  # noqa: E999
+
+    log.info("Deploy Bundle...")
+    model = ops_test.model_full_name
+    cmd = "juju deploy -m {model} {bundle}".format(model=model, bundle=bundle)
+    rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
+    assert rc == 0, "Bundle deploy failed: {}".format((stderr or stdout).strip())
+
     await ops_test.model.wait_for_idle(status="active", timeout=60 * 60, idle_period=60)
 
 
