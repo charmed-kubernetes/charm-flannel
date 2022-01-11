@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import shlex
 from ipaddress import ip_address, ip_network
 from time import sleep
 
@@ -42,11 +43,13 @@ async def _create_test_pod(model):
             ]
         }
     }
+    log.info("Creating Test Pod")
     resp = api.create_namespaced_pod(body=pod_manifest, namespace="default")
     # wait for pod not to be in pending
     i = 0
     while resp.status.phase == "Pending" and i < 30:
         i += 1
+        log.info("pod pending {s} seconds...".format(s=(i-1)*10))
         sleep(10)
         resp = api.read_namespaced_pod("test", namespace="default")
 
@@ -62,7 +65,9 @@ async def validate_flannel_cidr_network(ops_test):
 
     for unit in flannel.units:
         assert unit.workload_status == "active"
-        assert _get_flannel_subnet_ip(unit) in cidr_network
+        subnet = _get_flannel_subnet_ip(unit)
+        log.info("{name} reports subnet {subnet}".format(name=unit.name, subnet=subnet))
+        assert subnet in cidr_network
 
     # create test pod
     resp = await _create_test_pod(ops_test.model)
@@ -71,26 +76,29 @@ async def validate_flannel_cidr_network(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, flannel_resource):
+async def test_build_and_deploy(ops_test, setup_resources):
     """Build and deploy Flannel in bundle."""
-    flannel_charm = await ops_test.build_charm(".")
+    log.info("Build Charm...")
+    charm = await ops_test.build_charm(".")
+
+    log.info("Build Bundle...")
+    charm_resources = {
+        rsc.name.replace("-", "_").replace('.tar.gz', ''): rsc
+        for rsc in setup_resources
+    }
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
-        master_charm=flannel_charm,
+        master_charm=charm,
         series="focal",
-        flannel_resource="{0}: {1}".format(*flannel_resource),
+        **charm_resources
     )
-    await ops_test.model.deploy(bundle)
-    # NOTE (rgildein): resource attach is not implemented in python-libjuju
-    # await ops_test.model.applications["flannel"].attach(*flannel_resource)
-    rc, stdout, stderr = await ops_test.run(
-        "juju",
-        "attach",
-        "-m", ops_test.model_full_name,
-        "flannel",
-        "{0}={1}".format(*flannel_resource),
-    )
-    assert rc == 0, f"Failed to attach resource: {stderr or stdout}"  # noqa: E999
+
+    log.info("Deploy Bundle...")
+    model = ops_test.model_full_name
+    cmd = "juju deploy -m {model} {bundle}".format(model=model, bundle=bundle)
+    rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
+    assert rc == 0, "Bundle deploy failed: {}".format((stderr or stdout).strip())
+
     await ops_test.model.wait_for_idle(status="active", timeout=60 * 60, idle_period=60)
 
 
@@ -103,21 +111,37 @@ async def test_change_cidr_network(ops_test):
     """Test configuration change."""
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
-    rc, stdout, stderr = await ops_test.run(
-        "juju", "run", "-m", ops_test.model_full_name, "--application", "flannel",
-        "--", "hooks/config-changed"
-    )
-    assert rc == 0, f"Failed to run hook with resource: {stderr or stdout}"
-
-    # note (rgildein): There is need to restart kubernetes-worker machine.
-    #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
-    k8s_worker = ops_test.model.applications["kubernetes-worker"].units[0]
     rc, stdout, stderr = await ops_test.juju(
-        "ssh", "-m", ops_test.model_full_name, f"{k8s_worker.name}",
-        "--", "sudo su root -c '(sleep 5; reboot) &'"
+        "run", "-m", ops_test.model_full_name,
+        "--application", "flannel", "hooks/update-status"
     )
-    assert rc == 0, ("Failed to restart kubernetes-worker with "
-                     f"resource: {stderr or stdout}")
+    assert rc == 0, "Failed to run hook with resource: {err}"\
+        .format(err=stderr or stdout)
 
-    await ops_test.model.wait_for_idle(status="active", timeout=10 * 60, idle_period=60)
+    # note (rgildein): There is need to restart kubernetes-worker machines.
+    #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
+    for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
+        rc, stdout, stderr = await ops_test.juju(
+            "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name,
+            "sudo su root -c '(sleep 5; reboot) &'"
+        )
+        assert rc == 0, ("Failed to reboot {name} with error: {err}"
+                         .format(name=k8s_worker.name, err=stderr or stdout))
+        log.info("Rebooting {name}...{err}"
+                 .format(name=k8s_worker.name, err=stderr or stdout))
+
+    await ops_test.model.wait_for_idle(
+        status="active", timeout=10 * 60, idle_period=60, raise_on_error=False
+    )
+
+    for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
+        rc, stdout, stderr = await ops_test.juju(
+            "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
+        )
+        assert rc == 0, ("Failed to fetch uptime @{name} with error: {err}"
+                         .format(name=k8s_worker.name, err=stderr or stdout))
+        log.info("Rebooting complete {name}: uptime {err}"
+                 .format(name=k8s_worker.name, err=stderr or stdout))
+
+    log.info("Stability reached after reboot")
     await validate_flannel_cidr_network(ops_test)
