@@ -26,14 +26,14 @@ applications:
     to:
     - '0'
   flannel:
-    charm: {{ master_charm }}
+    charm: {{ charm }}
     resources:
       flannel-amd64: {{flannel_amd64|default("0")}}
       flannel-arm64: {{flannel_arm64|default("0")}}
       flannel-s390x: {{flannel_s390x|default("0")}}
-  kubernetes-master:
-    charm: ch:containers-kubernetes-master
-    channel: edge
+  kubernetes-control-plane:
+    charm: kubernetes-control-plane
+    channel: latest/edge
     constraints: cores=4 mem=4G root-disk=16G
     expose: true
     num_units: 1
@@ -53,13 +53,13 @@ applications:
     - '1'
 
 relations:
-- - kubernetes-master:kube-api-endpoint
+- - kubernetes-control-plane:kube-api-endpoint
   - kubernetes-worker:kube-api-endpoint
-- - kubernetes-master:kube-control
+- - kubernetes-control-plane:kube-control
   - kubernetes-worker:kube-control
-- - kubernetes-master:certificates
+- - kubernetes-control-plane:certificates
   - easyrsa:client
-- - kubernetes-master:etcd
+- - kubernetes-control-plane:etcd
   - etcd:db
 - - kubernetes-worker:certificates
   - easyrsa:client
@@ -68,10 +68,10 @@ relations:
 - - flannel:etcd
   - etcd:db
 - - flannel:cni
-  - kubernetes-master:cni
+  - kubernetes-control-plane:cni
 - - flannel:cni
   - kubernetes-worker:cni
 - - containerd:containerd
   - kubernetes-worker:container-runtime
 - - containerd:containerd
-  - kubernetes-master:container-runtime
+  - kubernetes-control-plane:container-runtime

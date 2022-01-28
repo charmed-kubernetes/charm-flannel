@@ -19,8 +19,8 @@ def _get_flannel_subnet_ip(unit):
 
 
 async def _get_kubeconfig(model):
-    """Get kubeconfig from kubernetes-master."""
-    unit = model.applications["kubernetes-master"].units[0]
+    """Get kubeconfig from kubernetes-control-plane."""
+    unit = model.applications["kubernetes-control-plane"].units[0]
     action = await unit.run_action("get-kubeconfig")
     output = await action.wait()  # wait for result
     return json.loads(output.data.get("results", {}).get("kubeconfig", "{}"))
@@ -88,7 +88,7 @@ async def test_build_and_deploy(ops_test, setup_resources):
     }
     bundle = ops_test.render_bundle(
         "tests/data/bundle.yaml",
-        master_charm=charm,
+        charm=charm,
         series="focal",
         **charm_resources
     )
