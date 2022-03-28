@@ -39,9 +39,9 @@ async def _create_test_pod(model):
         "metadata": {"name": "test"},
         "spec": {
             "containers": [
-                {"image": "busybox", "name": "test", "args": ["echo", "\"test\""]}
+                {"image": "busybox", "name": "test", "args": ["echo", '"test"']}
             ]
-        }
+        },
     }
     log.info("Creating Test Pod")
     resp = api.create_namespaced_pod(body=pod_manifest, namespace="default")
@@ -49,7 +49,7 @@ async def _create_test_pod(model):
     i = 0
     while resp.status.phase == "Pending" and i < 30:
         i += 1
-        log.info("pod pending {s} seconds...".format(s=(i-1)*10))
+        log.info("pod pending {s} seconds...".format(s=(i - 1) * 10))
         sleep(10)
         resp = api.read_namespaced_pod("test", namespace="default")
 
@@ -71,8 +71,9 @@ async def validate_flannel_cidr_network(ops_test):
 
     # create test pod
     resp = await _create_test_pod(ops_test.model)
-    assert ip_address(resp.status.pod_ip) in cidr_network, \
-        "the new pod does not get the ip address in the cidr network"
+    assert (
+        ip_address(resp.status.pod_ip) in cidr_network
+    ), "the new pod does not get the ip address in the cidr network"
 
 
 @pytest.mark.abort_on_fail
@@ -83,14 +84,11 @@ async def test_build_and_deploy(ops_test, setup_resources):
 
     log.info("Build Bundle...")
     charm_resources = {
-        rsc.name.replace("-", "_").replace('.tar.gz', ''): rsc
+        rsc.name.replace("-", "_").replace(".tar.gz", ""): rsc
         for rsc in setup_resources
     }
     bundle = ops_test.render_bundle(
-        "tests/data/bundle.yaml",
-        charm=charm,
-        series="focal",
-        **charm_resources
+        "tests/data/bundle.yaml", charm=charm, series="focal", **charm_resources
     )
 
     log.info("Deploy Bundle...")
@@ -112,23 +110,36 @@ async def test_change_cidr_network(ops_test):
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
     rc, stdout, stderr = await ops_test.juju(
-        "run", "-m", ops_test.model_full_name,
-        "--application", "flannel", "hooks/update-status"
+        "run",
+        "-m",
+        ops_test.model_full_name,
+        "--application",
+        "flannel",
+        "hooks/update-status",
     )
-    assert rc == 0, "Failed to run hook with resource: {err}"\
-        .format(err=stderr or stdout)
+    assert rc == 0, "Failed to run hook with resource: {err}".format(
+        err=stderr or stdout
+    )
 
     # note (rgildein): There is need to restart kubernetes-worker machines.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
         rc, stdout, stderr = await ops_test.juju(
-            "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name,
-            "sudo su root -c '(sleep 5; reboot) &'"
+            "run",
+            "-m",
+            ops_test.model_full_name,
+            "--unit",
+            k8s_worker.name,
+            "sudo su root -c '(sleep 5; reboot) &'",
         )
-        assert rc == 0, ("Failed to reboot {name} with error: {err}"
-                         .format(name=k8s_worker.name, err=stderr or stdout))
-        log.info("Rebooting {name}...{err}"
-                 .format(name=k8s_worker.name, err=stderr or stdout))
+        assert rc == 0, "Failed to reboot {name} with error: {err}".format(
+            name=k8s_worker.name, err=stderr or stdout
+        )
+        log.info(
+            "Rebooting {name}...{err}".format(
+                name=k8s_worker.name, err=stderr or stdout
+            )
+        )
 
     await ops_test.model.wait_for_idle(
         status="active", timeout=10 * 60, idle_period=60, raise_on_error=False
@@ -138,10 +149,14 @@ async def test_change_cidr_network(ops_test):
         rc, stdout, stderr = await ops_test.juju(
             "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
         )
-        assert rc == 0, ("Failed to fetch uptime @{name} with error: {err}"
-                         .format(name=k8s_worker.name, err=stderr or stdout))
-        log.info("Rebooting complete {name}: uptime {err}"
-                 .format(name=k8s_worker.name, err=stderr or stdout))
+        assert rc == 0, "Failed to fetch uptime @{name} with error: {err}".format(
+            name=k8s_worker.name, err=stderr or stdout
+        )
+        log.info(
+            "Rebooting complete {name}: uptime {err}".format(
+                name=k8s_worker.name, err=stderr or stdout
+            )
+        )
 
     log.info("Stability reached after reboot")
     await validate_flannel_cidr_network(ops_test)
