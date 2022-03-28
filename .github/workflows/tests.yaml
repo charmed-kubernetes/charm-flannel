@@ -1,8 +1,26 @@
 name: Run tests with Tox
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
+  Inclusive-naming-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: woke
+        uses: canonical-web-and-design/inclusive-naming@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+          fail-on-error: true
+
   unit-tests:
     name: Lint, Unit Tests
     runs-on: ubuntu-latest
@@ -20,7 +38,12 @@ jobs:
           pip install tox
           sudo snap install charm --classic
       - name: Run Tox
-        run: tox # Run tox using the version of Python in `PATH`
+        env:
+          python_dot_version: ${{ matrix.python }}
+        run: |
+          lint="lint"
+          if [[ "${python_dot_version}" == "3.5" ]] ; then lint="py35-lint"; fi
+          tox -e $lint,unit
       - name: Validate Wheelhouse
         run: tox -vve validate-wheelhouse
 
