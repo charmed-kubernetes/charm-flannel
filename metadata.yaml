@@ -11,8 +11,8 @@ maintainers:
   - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
   - Charles Butler <Chuck@dasroot.net>
 series:
-  - jammy
   - focal
+  - jammy
   - bionic
   - xenial
 subordinate: true
