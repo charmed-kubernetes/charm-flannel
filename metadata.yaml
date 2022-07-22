@@ -12,8 +12,8 @@ maintainers:
   - Charles Butler <Chuck@dasroot.net>
 series:
   - focal
+  - jammy
   - bionic
-  - xenial
 subordinate: true
 tags:
   - networking
