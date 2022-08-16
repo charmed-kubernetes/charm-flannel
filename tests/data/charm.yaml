@@ -1,0 +1,18 @@
+description: A minimal Kubernetes cluster with two machines with virtual networks provided by Flannel.
+series: &series {{ series }}
+applications:
+  calico: null
+  flannel:
+    charm: {{ charm }}
+    channel: null
+    resources:
+      flannel-amd64: {{flannel_amd64|default("0")}}
+      flannel-arm64: {{flannel_arm64|default("0")}}
+      flannel-s390x: {{flannel_s390x|default("0")}}
+relations:
+- - flannel:etcd
+  - etcd:db
+- - flannel:cni
+  - kubernetes-control-plane:cni
+- - flannel:cni
+  - kubernetes-worker:cni

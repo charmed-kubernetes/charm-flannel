@@ -3,6 +3,7 @@ import logging
 import re
 import shlex
 from ipaddress import ip_address, ip_network
+from pathlib import Path
 from time import sleep
 
 import pytest
@@ -77,23 +78,40 @@ async def validate_flannel_cidr_network(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, setup_resources):
+async def test_build_and_deploy(ops_test, series: str):
     """Build and deploy Flannel in bundle."""
-    log.info("Build Charm...")
-    charm = await ops_test.build_charm(".")
+    charm = next(Path.cwd().glob("flannel*.charm"), None)
+    if not charm:
+        log.info("Build Charm...")
+        charm = await ops_test.build_charm(".")
+
+    build_script = Path.cwd() / "build-flannel-resources.sh"
+    resources = await ops_test.build_resources(build_script)
+    expected_resources = {"flannel-amd64", "flannel-arm64", "flannel-s390x"}
+
+    if resources and all(rsc.stem in expected_resources for rsc in resources):
+        resources = {rsc.stem.replace("-", "_"): rsc for rsc in resources}
+    else:
+        log.info("Failed to build resources, downloading from latest/edge")
+        arch_resources = ops_test.arch_specific_resources(charm)
+        resources = await ops_test.download_resources(charm, resources=arch_resources)
+        resources = {name.replace("-", "_"): rsc for name, rsc in resources.items()}
+
+    assert resources, "Failed to build or download charm resources."
 
     log.info("Build Bundle...")
-    charm_resources = {
-        rsc.name.replace("-", "_").replace(".tar.gz", ""): rsc
-        for rsc in setup_resources
-    }
-    bundle = ops_test.render_bundle(
-        "tests/data/bundle.yaml", charm=charm, series="focal", **charm_resources
-    )
+    context = dict(charm=charm, series=series, **resources)
+    overlays = [
+        ops_test.Bundle("kubernetes-core", channel="edge"),
+        Path("tests/data/charm.yaml"),
+    ]
+    bundle, *overlays = await ops_test.async_render_bundles(*overlays, **context)
 
     log.info("Deploy Bundle...")
     model = ops_test.model_full_name
-    cmd = "juju deploy -m {model} {bundle}".format(model=model, bundle=bundle)
+    cmd = f"juju deploy -m {model} {bundle} " + " ".join(
+        f"--overlay={f}" for f in overlays
+    )
     rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
     assert rc == 0, "Bundle deploy failed: {}".format((stderr or stdout).strip())
 
