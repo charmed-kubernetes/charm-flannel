@@ -26,6 +26,7 @@ mkdir "$temp_dir"
   for arch in $ARCH; do
     echo "Building flannel $FLANNEL_VERSION for $arch"
     (cd flannel
+      sed -i 's/"-static"/""/g' Makefile
       ARCH=$arch make dist/flanneld-$arch
     )
 
