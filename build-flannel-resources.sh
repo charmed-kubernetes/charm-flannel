@@ -33,11 +33,11 @@ mkdir "$temp_dir"
   for arch in $ARCH; do
     echo "Building flannel $FLANNEL_VERSION for $arch"
     (cd flannel
-      TAG="${FLANNEL_VERSION}+ck1" ARCH=$arch make dist/flanneld-$arch
+      sudo TAG="${FLANNEL_VERSION}+ck1" ARCH=$arch make dist/flanneld-$arch
     )
 
     echo "Building etcd $ETCD_VERSION for $arch"
-    docker run \
+    sudo docker run \
       --rm \
       -e GOOS=linux \
       -e GOARCH="$arch" \

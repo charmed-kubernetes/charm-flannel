@@ -91,7 +91,7 @@ async def test_build_and_deploy(ops_test, series: str):
         charm = await ops_test.build_charm(".")
 
     build_script = Path.cwd() / "build-flannel-resources.sh"
-    resources = await ops_test.build_resources(build_script)
+    resources = await ops_test.build_resources(build_script, with_sudo=False)
     expected_resources = {"flannel-amd64", "flannel-arm64", "flannel-s390x"}
 
     if resources and all(remove_ext(rsc) in expected_resources for rsc in resources):
