@@ -2,6 +2,12 @@ description: A minimal Kubernetes cluster with two machines with virtual network
 series: &series {{ series }}
 applications:
   calico: null
+  kubernetes-control-plane:
+    options:
+      channel: {{ snap_channel }}
+  kubernetes-worker:
+    options:
+      channel: {{ snap_channel }}
   flannel:
     charm: {{ charm }}
     channel: null

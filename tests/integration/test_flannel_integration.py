@@ -83,7 +83,7 @@ def remove_ext(path: Path) -> str:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, series: str):
+async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
     """Build and deploy Flannel in bundle."""
     charm = next(Path.cwd().glob("flannel*.charm"), None)
     if not charm:
@@ -105,7 +105,7 @@ async def test_build_and_deploy(ops_test, series: str):
     assert resources, "Failed to build or download charm resources."
 
     log.info("Build Bundle...")
-    context = dict(charm=charm, series=series, **resources)
+    context = dict(charm=charm, series=series, snap_channel=snap_channel, **resources)
     overlays = [
         ops_test.Bundle("kubernetes-core", channel="edge"),
         Path("tests/data/charm.yaml"),
