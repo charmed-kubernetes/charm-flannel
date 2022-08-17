@@ -147,21 +147,19 @@ async def test_change_cidr_network(ops_test):
     # note (rgildein): There is need to restart kubernetes-worker machines.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
-        rc, stdout, stderr = await ops_test.juju(
-            "run",
-            "-m",
-            ops_test.model_full_name,
-            "--unit",
-            k8s_worker.name,
-            "sudo su root -c '(sleep 5; reboot) &'",
-        )
-        assert rc == 0, "Failed to reboot {name} with error: {err}".format(
-            name=k8s_worker.name, err=stderr or stdout
-        )
+        action = await k8s_worker.run("nohup sudo reboot &>/dev/null & exit")
         log.info(
-            "Rebooting {name}...{err}".format(
-                name=k8s_worker.name, err=stderr or stdout
+            "Rebooting {name}...\n{data}".format(
+                name=k8s_worker.name, data=json.dumps(action.data, indent=2)
             )
+        )
+        result = await action.wait()
+        stdout = result.results.get("Stdout") or result.results.get("stdout")
+        stderr = result.results.get("Stderr") or result.results.get("stderr")
+        assert (
+            action.status == "completed"
+        ), "Failed to reboot {name} with error: {err}".format(
+            name=k8s_worker.name, err=stderr or stdout
         )
 
     await ops_test.model.wait_for_idle(
