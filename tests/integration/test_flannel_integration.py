@@ -24,7 +24,7 @@ async def _get_kubeconfig(model):
     unit = model.applications["kubernetes-control-plane"].units[0]
     action = await unit.run_action("get-kubeconfig")
     output = await action.wait()  # wait for result
-    return json.loads(output.data.get("results", {}).get("kubeconfig", "{}"))
+    return json.loads(output.results.get("kubeconfig", "{}"))
 
 
 async def _create_test_pod(model):
@@ -77,6 +77,11 @@ async def validate_flannel_cidr_network(ops_test):
     ), "the new pod does not get the ip address in the cidr network"
 
 
+def remove_ext(path: Path) -> str:
+    suffixes = "".join(path.suffixes)
+    return path.name.replace(suffixes, "")
+
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test, series: str):
     """Build and deploy Flannel in bundle."""
@@ -89,8 +94,8 @@ async def test_build_and_deploy(ops_test, series: str):
     resources = await ops_test.build_resources(build_script)
     expected_resources = {"flannel-amd64", "flannel-arm64", "flannel-s390x"}
 
-    if resources and all(rsc.stem in expected_resources for rsc in resources):
-        resources = {rsc.stem.replace("-", "_"): rsc for rsc in resources}
+    if resources and all(remove_ext(rsc) in expected_resources for rsc in resources):
+        resources = {remove_ext(rsc).replace("-", "_"): rsc for rsc in resources}
     else:
         log.info("Failed to build resources, downloading from latest/edge")
         arch_resources = ops_test.arch_specific_resources(charm)
