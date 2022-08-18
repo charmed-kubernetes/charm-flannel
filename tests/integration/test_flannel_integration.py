@@ -3,6 +3,7 @@ import logging
 import re
 import shlex
 from ipaddress import ip_address, ip_network
+from pathlib import Path
 from time import sleep
 
 import pytest
@@ -23,7 +24,7 @@ async def _get_kubeconfig(model):
     unit = model.applications["kubernetes-control-plane"].units[0]
     action = await unit.run_action("get-kubeconfig")
     output = await action.wait()  # wait for result
-    return json.loads(output.data.get("results", {}).get("kubeconfig", "{}"))
+    return json.loads(output.results.get("kubeconfig", "{}"))
 
 
 async def _create_test_pod(model):
@@ -76,24 +77,46 @@ async def validate_flannel_cidr_network(ops_test):
     ), "the new pod does not get the ip address in the cidr network"
 
 
+def remove_ext(path: Path) -> str:
+    suffixes = "".join(path.suffixes)
+    return path.name.replace(suffixes, "")
+
+
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test, setup_resources):
+async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
     """Build and deploy Flannel in bundle."""
-    log.info("Build Charm...")
-    charm = await ops_test.build_charm(".")
+    charm = next(Path.cwd().glob("flannel*.charm"), None)
+    if not charm:
+        log.info("Build Charm...")
+        charm = await ops_test.build_charm(".")
+
+    build_script = Path.cwd() / "build-flannel-resources.sh"
+    resources = await ops_test.build_resources(build_script, with_sudo=False)
+    expected_resources = {"flannel-amd64", "flannel-arm64", "flannel-s390x"}
+
+    if resources and all(remove_ext(rsc) in expected_resources for rsc in resources):
+        resources = {remove_ext(rsc).replace("-", "_"): rsc for rsc in resources}
+    else:
+        log.info("Failed to build resources, downloading from latest/edge")
+        arch_resources = ops_test.arch_specific_resources(charm)
+        resources = await ops_test.download_resources(charm, resources=arch_resources)
+        resources = {name.replace("-", "_"): rsc for name, rsc in resources.items()}
+
+    assert resources, "Failed to build or download charm resources."
 
     log.info("Build Bundle...")
-    charm_resources = {
-        rsc.name.replace("-", "_").replace(".tar.gz", ""): rsc
-        for rsc in setup_resources
-    }
-    bundle = ops_test.render_bundle(
-        "tests/data/bundle.yaml", charm=charm, series="focal", **charm_resources
-    )
+    context = dict(charm=charm, series=series, snap_channel=snap_channel, **resources)
+    overlays = [
+        ops_test.Bundle("kubernetes-core", channel="edge"),
+        Path("tests/data/charm.yaml"),
+    ]
+    bundle, *overlays = await ops_test.async_render_bundles(*overlays, **context)
 
     log.info("Deploy Bundle...")
     model = ops_test.model_full_name
-    cmd = "juju deploy -m {model} {bundle}".format(model=model, bundle=bundle)
+    cmd = f"juju deploy -m {model} {bundle} " + " ".join(
+        f"--overlay={f}" for f in overlays
+    )
     rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
     assert rc == 0, "Bundle deploy failed: {}".format((stderr or stdout).strip())
 
@@ -124,21 +147,19 @@ async def test_change_cidr_network(ops_test):
     # note (rgildein): There is need to restart kubernetes-worker machines.
     #                  https://bugs.launchpad.net/charm-flannel/+bug/1932551
     for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
-        rc, stdout, stderr = await ops_test.juju(
-            "run",
-            "-m",
-            ops_test.model_full_name,
-            "--unit",
-            k8s_worker.name,
-            "sudo su root -c '(sleep 5; reboot) &'",
-        )
-        assert rc == 0, "Failed to reboot {name} with error: {err}".format(
-            name=k8s_worker.name, err=stderr or stdout
-        )
+        action = await k8s_worker.run("nohup sudo reboot &>/dev/null & exit")
         log.info(
-            "Rebooting {name}...{err}".format(
-                name=k8s_worker.name, err=stderr or stdout
+            "Rebooting {name}...\n{data}".format(
+                name=k8s_worker.name, data=json.dumps(action.data, indent=2)
             )
+        )
+        result = await action.wait()
+        stdout = result.results.get("Stdout") or result.results.get("stdout")
+        stderr = result.results.get("Stderr") or result.results.get("stderr")
+        assert (
+            action.status == "completed"
+        ), "Failed to reboot {name} with error: {err}".format(
+            name=k8s_worker.name, err=stderr or stdout
         )
 
     await ops_test.model.wait_for_idle(

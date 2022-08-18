@@ -23,10 +23,17 @@ mkdir "$temp_dir"
   GROUP_ID=$(id -g)
   USER_ID=$(id -u)
 
+  # Patch flannel builds for operation with bionic, focal, and jammy
+  (cd flannel
+    sed -e 's/CGO_ENABLED=1/CGO_ENABLED=0/g' -i Makefile                 # Don't ever enable CGO, even on AMD64
+    sed -e 's/GOARCH=$(ARCH)/GOARCH=$(ARCH) -e TAG=$(TAG)/' -i Makefile  # pass a provided TAG through to ARCH specific docker builds
+    sed -e '/udp/ s#^\/*#//#' -i main.go                                 # remove the udp backend since it's unused
+  )
+
   for arch in $ARCH; do
     echo "Building flannel $FLANNEL_VERSION for $arch"
     (cd flannel
-      ARCH=$arch make dist/flanneld-$arch
+      TAG="${FLANNEL_VERSION}+ck1" ARCH=$arch make dist/flanneld-$arch
     )
 
     echo "Building etcd $ETCD_VERSION for $arch"
