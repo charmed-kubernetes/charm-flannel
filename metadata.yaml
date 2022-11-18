@@ -11,9 +11,8 @@ maintainers:
   - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
   - Charles Butler <Chuck@dasroot.net>
 series:
-  - focal
   - jammy
-  - bionic
+  - focal
 subordinate: true
 tags:
   - networking
