@@ -2,7 +2,7 @@
 set -eux
 
 FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.20.2"}
-ETCD_VERSION=${ETCD_VERSION:-"v2.3.7"}
+ETCD_VERSION=${ETCD_VERSION:-"v3.4.22"}
 
 ARCH=${ARCH:-"amd64 arm64 s390x"}
 
@@ -42,7 +42,7 @@ mkdir "$temp_dir"
       -e GOOS=linux \
       -e GOARCH="$arch" \
       -v $temp_dir/etcd:/etcd \
-      golang:1.15 \
+      golang:1.19 \
       /bin/bash -c "cd /etcd && ./build && chown -R ${USER_ID}:${GROUP_ID} /etcd"
 
     rm -rf contents
