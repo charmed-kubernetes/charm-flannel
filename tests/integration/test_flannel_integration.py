@@ -90,7 +90,7 @@ async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
         log.info("Build Charm...")
         charm = await ops_test.build_charm(".")
 
-    resources = next(Path.cwd().glob("flannel*.tar.gz"), None)
+    resources = list(Path.cwd().glob("flannel*.tar.gz"))
     if not resources:
         log.info("Build Resources...")
         build_script = Path.cwd() / "build-flannel-resources.sh"
