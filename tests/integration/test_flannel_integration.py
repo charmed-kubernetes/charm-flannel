@@ -40,7 +40,11 @@ async def _create_test_pod(model):
         "metadata": {"name": "test"},
         "spec": {
             "containers": [
-                {"image": "busybox", "name": "test", "args": ["echo", '"test"']}
+                {
+                    "image": "rocks.canonical.com/cdk/busybox:1.32",
+                    "name": "test",
+                    "args": ["echo", '"test"'],
+                }
             ]
         },
     }
