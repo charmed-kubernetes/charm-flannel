@@ -40,7 +40,11 @@ async def _create_test_pod(model):
         "metadata": {"name": "test"},
         "spec": {
             "containers": [
-                {"image": "busybox", "name": "test", "args": ["echo", '"test"']}
+                {
+                    "image": "rocks.canonical.com/cdk/busybox:1.32",
+                    "name": "test",
+                    "args": ["echo", '"test"'],
+                }
             ]
         },
     }
@@ -90,8 +94,11 @@ async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
         log.info("Build Charm...")
         charm = await ops_test.build_charm(".")
 
-    build_script = Path.cwd() / "build-flannel-resources.sh"
-    resources = await ops_test.build_resources(build_script, with_sudo=False)
+    resources = list(Path.cwd().glob("flannel*.tar.gz"))
+    if not resources:
+        log.info("Build Resources...")
+        build_script = Path.cwd() / "build-flannel-resources.sh"
+        resources = await ops_test.build_resources(build_script, with_sudo=False)
     expected_resources = {"flannel-amd64", "flannel-arm64", "flannel-s390x"}
 
     if resources and all(remove_ext(rsc) in expected_resources for rsc in resources):
