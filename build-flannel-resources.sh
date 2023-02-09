@@ -41,6 +41,7 @@ mkdir "$temp_dir"
       --rm \
       -e GOOS=linux \
       -e GOARCH="$arch" \
+      -e GOFLAGS=-buildvcs=false \
       -v $temp_dir/etcd:/etcd \
       golang:1.19 \
       /bin/bash -c "cd /etcd && ./build && chown -R ${USER_ID}:${GROUP_ID} /etcd"
