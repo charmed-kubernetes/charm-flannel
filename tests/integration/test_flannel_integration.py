@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import shlex
+import shutil
 from ipaddress import ip_address, ip_network
 from pathlib import Path
 from time import sleep
@@ -95,7 +96,14 @@ async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
         charm = await ops_test.build_charm(".")
 
     resources = list(Path.cwd().glob("flannel*.tar.gz"))
-    if not resources:
+    if resources:
+        log.info("Using pre-built resources...")
+        resource_dir = ops_test.tmp_path / "resources"
+        resource_dir.mkdir(exist_ok=True)
+        for resource in resources:
+            shutil.copy(resource, resource_dir)
+        resources = list(resource_dir.glob("*"))
+    else:
         log.info("Build Resources...")
         build_script = Path.cwd() / "build-flannel-resources.sh"
         resources = await ops_test.build_resources(build_script, with_sudo=False)
