@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 from shlex import split
 from subprocess import check_output, check_call, CalledProcessError, STDOUT
 
@@ -63,6 +64,8 @@ def install_flannel_binaries():
         app_path = os.path.join(app["path"], app["name"])
         install = ["install", "-v", "-D", unpacked, app_path]
         check_call(install)
+    os.makedirs("/opt/cni/bin", exist_ok=True)
+    shutil.copy(unpack_path + "/cni-plugin/flannel", "/opt/cni/bin")
     set_state("flannel.binaries.installed")
 
 

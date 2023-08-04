@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -eux
 
-FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.20.2"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.22.1"}
+FLANNEL_CNI_PLUGIN_VERSION=${FLANNEL_CNI_PLUGIN_VERSION:-"v1.2.0"}
 ETCD_VERSION=${ETCD_VERSION:-"v3.4.22"}
 
 ARCH=${ARCH:-"amd64 arm64 s390x"}
@@ -11,11 +12,15 @@ temp_dir="$(readlink -f build-flannel-resources.tmp)"
 rm -rf "$temp_dir"
 mkdir "$temp_dir"
 (cd "$temp_dir"
-  git clone https://github.com/coreos/flannel.git flannel \
+  git clone https://github.com/flannel-io/flannel.git flannel \
     --branch "$FLANNEL_VERSION" \
     --depth 1
 
-  git clone https://github.com/coreos/etcd.git etcd \
+  git clone https://github.com/flannel-io/cni-plugin.git cni-plugin \
+    --branch "$FLANNEL_CNI_PLUGIN_VERSION" \
+    --depth 1
+
+  git clone https://github.com/etcd-io/etcd.git etcd \
     --branch "$ETCD_VERSION" \
     --depth 1
 
@@ -36,6 +41,14 @@ mkdir "$temp_dir"
       TAG="${FLANNEL_VERSION}+ck1" ARCH=$arch make dist/flanneld-$arch
     )
 
+    echo "Building cni-plugin $FLANNEL_CNI_PLUGIN_VERSION for $arch"
+    docker run \
+      --rm \
+      -e GOFLAGS=-buildvcs=false \
+      -v $temp_dir/cni-plugin:/cni-plugin \
+      golang:1.20 \
+      /bin/bash -c "cd /cni-plugin && ARCH=$arch make build_linux && chown -R ${USER_ID}:${GROUP_ID} ."
+
     echo "Building etcd $ETCD_VERSION for $arch"
     docker run \
       --rm \
@@ -53,8 +66,10 @@ mkdir "$temp_dir"
       echo "etcdctl version $ETCD_VERSION" >> BUILD_INFO
       echo "built $(date)" >> BUILD_INFO
       echo "build script commit: $build_script_commit" >> BUILD_INFO
+      mkdir cni-plugin
       cp "$temp_dir"/etcd/bin/etcdctl .
       cp "$temp_dir"/flannel/dist/flanneld-$arch ./flanneld
+      cp "$temp_dir"/cni-plugin/dist/flannel-$arch cni-plugin/flannel
       tar -caf "$temp_dir/flannel-$arch.tar.gz" .
     )
   done
