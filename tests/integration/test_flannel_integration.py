@@ -140,7 +140,7 @@ async def test_change_cidr_network(ops_test):
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
     rc, stdout, stderr = await ops_test.juju(
-        "run",
+        "exec",
         "-m",
         ops_test.model_full_name,
         "--application",
@@ -175,7 +175,7 @@ async def test_change_cidr_network(ops_test):
 
     for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
         rc, stdout, stderr = await ops_test.juju(
-            "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
+            "exec", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
         )
         assert rc == 0, "Failed to fetch uptime @{name} with error: {err}".format(
             name=k8s_worker.name, err=stderr or stdout
