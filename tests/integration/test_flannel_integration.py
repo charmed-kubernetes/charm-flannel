@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import shlex
+import shutil
 from ipaddress import ip_address, ip_network
 from pathlib import Path
 from time import sleep
@@ -95,7 +96,14 @@ async def test_build_and_deploy(ops_test, series: str, snap_channel: str):
         charm = await ops_test.build_charm(".")
 
     resources = list(Path.cwd().glob("flannel*.tar.gz"))
-    if not resources:
+    if resources:
+        log.info("Using pre-built resources...")
+        resource_dir = ops_test.tmp_path / "resources"
+        resource_dir.mkdir(exist_ok=True)
+        for resource in resources:
+            shutil.copy(resource, resource_dir)
+        resources = list(resource_dir.glob("*"))
+    else:
         log.info("Build Resources...")
         build_script = Path.cwd() / "build-flannel-resources.sh"
         resources = await ops_test.build_resources(build_script, with_sudo=False)
@@ -140,7 +148,7 @@ async def test_change_cidr_network(ops_test):
     flannel = ops_test.model.applications["flannel"]
     await flannel.set_config({"cidr": "10.2.0.0/16"})
     rc, stdout, stderr = await ops_test.juju(
-        "run",
+        "exec",
         "-m",
         ops_test.model_full_name,
         "--application",
@@ -175,7 +183,7 @@ async def test_change_cidr_network(ops_test):
 
     for k8s_worker in ops_test.model.applications["kubernetes-worker"].units:
         rc, stdout, stderr = await ops_test.juju(
-            "run", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
+            "exec", "-m", ops_test.model_full_name, "--unit", k8s_worker.name, "uptime"
         )
         assert rc == 0, "Failed to fetch uptime @{name} with error: {err}".format(
             name=k8s_worker.name, err=stderr or stdout
