@@ -36,7 +36,7 @@ jobs:
       - name: Build Resources
         run:  sudo ./build-flannel-resources.sh
       - name: Upload resource artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flannel-resources
           path: ./flannel*.tar.gz
@@ -67,7 +67,7 @@ jobs:
           bootstrap-constraints: "arch=amd64 cores=2 mem=4G"
 
       - name: Download resource artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: flannel-resources
 
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload debug artifacts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-run-artifacts
           path: tmp
