@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eux
 
-FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.22.1"}
+FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.22.3"}
 FLANNEL_CNI_PLUGIN_VERSION=${FLANNEL_CNI_PLUGIN_VERSION:-"v1.2.0"}
 ETCD_VERSION=${ETCD_VERSION:-"v3.4.22"}
 
@@ -45,7 +45,6 @@ mkdir "$temp_dir"
     docker run \
       --rm \
       -e GOFLAGS=-buildvcs=false \
-      -e GOPROXY=direct \
       -v $temp_dir/cni-plugin:/cni-plugin \
       golang:1.20 \
       /bin/bash -c "cd /cni-plugin && ARCH=$arch make build_linux && chown -R ${USER_ID}:${GROUP_ID} ."

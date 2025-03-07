@@ -14,7 +14,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--snap-channel",
         type=str,
-        default="1.24/stable",
+        default="1.32/stable",
         help="Set snap channel for the control-plane & worker units",
     )
 

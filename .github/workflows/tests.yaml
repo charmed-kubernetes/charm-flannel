@@ -18,10 +18,14 @@ jobs:
   validate-wheelhouse:
     name: Validate Wheelhouse
     uses: charmed-kubernetes/workflows/.github/workflows/validate-wheelhouse.yaml@main
+    with:
+      python: "['3.10', '3.12']"
 
   lint-unit:
     name: Lint Unit
     uses: charmed-kubernetes/workflows/.github/workflows/lint-unit.yaml@main
+    with:
+      python: "['3.10', '3.12']"
 
   resources-build:
     name: Build Resources with docker
@@ -40,11 +44,13 @@ jobs:
           path: ./flannel*.tar.gz
 
   integration-tests:
-    name: Integration test with vSphere
-    runs-on: self-hosted
+    name: Integration test with LXD
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs:
       - resources-build
+      - lint-unit
+      - validate-wheelhouse
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -54,14 +60,16 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Read charmcraft version file
+        id: charmcraft
+        run: echo "channel=$(cat .charmcraft-channel)" >> $GITHUB_OUTPUT
+
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          provider: vsphere
+          provider: lxd
           juju-channel: 3/stable
-          credentials-yaml: ${{ secrets.CREDENTIALS_YAML }}
-          clouds-yaml: ${{ secrets.CLOUDS_YAML }}
-          bootstrap-options: "${{ secrets.FOCAL_BOOTSTRAP_OPTIONS }} --model-default datastore=vsanDatastore --model-default primary-network=VLAN_2764"
+          charmcraft-channel: ${{ steps.charmcraft.outputs.channel }}
           bootstrap-constraints: "arch=amd64 cores=2 mem=4G"
 
       - name: Download resource artifacts
@@ -70,7 +78,7 @@ jobs:
           name: flannel-resources
 
       - name: Run integration test
-        run: tox -e integration -- --basetemp=/home/ubuntu/pytest
+        run: tox -e integration
 
       - name: Setup Debug Artifact Collection
         if: failure()
