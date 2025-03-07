@@ -45,6 +45,7 @@ mkdir "$temp_dir"
     docker run \
       --rm \
       -e GOFLAGS=-buildvcs=false \
+      -e GOPROXY=direct \
       -v $temp_dir/cni-plugin:/cni-plugin \
       golang:1.20 \
       /bin/bash -c "cd /cni-plugin && ARCH=$arch make build_linux && chown -R ${USER_ID}:${GROUP_ID} ."

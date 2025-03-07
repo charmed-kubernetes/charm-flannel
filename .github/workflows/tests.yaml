@@ -11,7 +11,7 @@ on:
 jobs:
   call-inclusive-naming-check:
     name: Inclusive naming
-    uses: canonical-web-and-design/Inclusive-naming/.github/workflows/woke.yaml@main
+    uses: canonical/inclusive-naming/.github/workflows/woke.yaml@main
     with:
       fail-on-error: "true"
 
@@ -30,19 +30,17 @@ jobs:
       - lint-unit
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
-      - name: Install Docker
-        run:  sudo snap install docker
+        uses: actions/checkout@v4
       - name: Build Resources
         run:  sudo ./build-flannel-resources.sh
       - name: Upload resource artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: flannel-resources
           path: ./flannel*.tar.gz
 
   integration-tests:
-    name: Integration test with Vsphere
+    name: Integration test with vSphere
     runs-on: self-hosted
     timeout-minutes: 60
     needs:
@@ -60,14 +58,14 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: vsphere
-          juju-channel: 3.1/stable
+          juju-channel: 3/stable
           credentials-yaml: ${{ secrets.CREDENTIALS_YAML }}
           clouds-yaml: ${{ secrets.CLOUDS_YAML }}
           bootstrap-options: "${{ secrets.FOCAL_BOOTSTRAP_OPTIONS }} --model-default datastore=vsanDatastore --model-default primary-network=VLAN_2764"
           bootstrap-constraints: "arch=amd64 cores=2 mem=4G"
 
       - name: Download resource artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: flannel-resources
 
@@ -84,7 +82,7 @@ jobs:
 
       - name: Upload debug artifacts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-run-artifacts
           path: tmp
