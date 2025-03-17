@@ -1,0 +1,37 @@
+name: flannel
+summary: A charm that provides a robust Software Defined Network
+description: |
+  it is a generic overlay network that can be used as a simple alternative
+  to existing software defined networking solutions
+docs: https://discourse.charmhub.io/t/flannel-docs-index/6179
+maintainers:
+  - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
+  - George Kraft <george.kraft@canonical.com>
+  - Rye Terrell <rye.terrell@canonical.com>
+  - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
+  - Charles Butler <Chuck@dasroot.net>
+series:
+  - noble
+  - jammy
+subordinate: true
+tags:
+  - networking
+requires:
+  etcd:
+    interface: etcd
+  cni:
+    interface: kubernetes-cni
+    scope: container
+resources:
+  flannel-amd64:
+    type: file
+    filename: flannel.tar.gz
+    description: "A tarball packaged release of flannel for amd64"
+  flannel-arm64:
+    type: file
+    filename: flannel.tar.gz
+    description: "A tarball packaged release of flannel for arm64"
+  flannel-s390x:
+    type: file
+    filename: flannel.tar.gz
+    description: "A tarball packaged release of flannel for s390x"

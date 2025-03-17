@@ -2,12 +2,6 @@ description: A minimal Kubernetes cluster with two machines with virtual network
 series: &series {{ series }}
 applications:
   calico: null
-  kubernetes-control-plane:
-    options:
-      channel: {{ snap_channel }}
-  kubernetes-worker:
-    options:
-      channel: {{ snap_channel }}
   flannel:
     charm: {{ charm }}
     channel: null
@@ -15,6 +9,11 @@ applications:
       flannel-amd64: {{flannel_amd64|default("0")}}
       flannel-arm64: {{flannel_arm64|default("0")}}
       flannel-s390x: {{flannel_s390x|default("0")}}
+machines:
+  "0":
+    constraints: "cores=2 mem=8G root-disk=16G virt-type=virtual-machine"
+  "1":
+    constraints: "cores=2 mem=8G root-disk=16G virt-type=virtual-machine"
 relations:
 - - flannel:etcd
   - etcd:db
