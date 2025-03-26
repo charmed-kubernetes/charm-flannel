@@ -3,7 +3,10 @@ set -eux
 
 FLANNEL_VERSION=${FLANNEL_VERSION:-"v0.22.3"}
 FLANNEL_CNI_PLUGIN_VERSION=${FLANNEL_CNI_PLUGIN_VERSION:-"v1.2.0"}
-ETCD_VERSION=${ETCD_VERSION:-"v3.4.22"}
+ETCD_VERSION=${ETCD_VERSION:-"v3.4.36"}
+export http_proxy=${http_proxy:-""}
+export https_proxy=${https_proxy:-""}
+export no_proxy=${no_proxy:-""}
 
 ARCH=${ARCH:-"amd64 arm64 s390x"}
 
@@ -31,7 +34,15 @@ mkdir "$temp_dir"
   # Patch flannel builds for operation with bionic, focal, and jammy
   (cd flannel
     sed -e 's/CGO_ENABLED=1/CGO_ENABLED=0/g' -i Makefile                 # Don't ever enable CGO, even on AMD64
-    sed -e 's/GOARCH=$(ARCH)/GOARCH=$(ARCH) -e TAG=$(TAG)/' -i Makefile  # pass a provided TAG through to ARCH specific docker builds
+    sed -e 's'/\
+'GOARCH=$(ARCH)'\
+'/'\
+'GOARCH=$(ARCH) '\
+'-e TAG=$(TAG) '\
+'-e http_proxy=$(http_proxy) '\
+'-e https_proxy=$(https_proxy) '\
+'-e no_proxy=$(no_proxy)'\
+'/' -i Makefile                        # pass a provided TAG through to ARCH specific docker builds
     sed -e '/udp/ s#^\/*#//#' -i main.go                                 # remove the udp backend since it's unused
   )
 
@@ -41,10 +52,27 @@ mkdir "$temp_dir"
       TAG="${FLANNEL_VERSION}+ck1" ARCH=$arch make dist/flanneld-$arch
     )
 
+    echo "Confirm proxy.golang.org is reachable"
+    docker run \
+      --rm \
+      -e GOOS=linux \
+      -e GOARCH="$arch" \
+      -e CGO_ENABLED=0 \
+      -e GOFLAGS=-buildvcs=false \
+      -e http_proxy="$http_proxy" \
+      -e https_proxy="$https_proxy" \
+      -e no_proxy="$no_proxy" \
+      -v $temp_dir/flannel:/flannel \
+      golang:1.20 \
+      /bin/bash -c "nslookup proxy.golang.org; curl https://proxy.golang.org/ "
+
     echo "Building cni-plugin $FLANNEL_CNI_PLUGIN_VERSION for $arch"
     docker run \
       --rm \
       -e GOFLAGS=-buildvcs=false \
+      -e http_proxy="$http_proxy" \
+      -e https_proxy="$https_proxy" \
+      -e no_proxy="$no_proxy" \
       -v $temp_dir/cni-plugin:/cni-plugin \
       golang:1.20 \
       /bin/bash -c "cd /cni-plugin && ARCH=$arch make build_linux && chown -R ${USER_ID}:${GROUP_ID} ."
@@ -55,8 +83,11 @@ mkdir "$temp_dir"
       -e GOOS=linux \
       -e GOARCH="$arch" \
       -e GOFLAGS=-buildvcs=false \
+      -e http_proxy="$http_proxy" \
+      -e https_proxy="$https_proxy" \
+      -e no_proxy="$no_proxy" \
       -v $temp_dir/etcd:/etcd \
-      golang:1.19 \
+      golang:1.23 \
       /bin/bash -c "cd /etcd && ./build && chown -R ${USER_ID}:${GROUP_ID} /etcd"
 
     rm -rf contents
