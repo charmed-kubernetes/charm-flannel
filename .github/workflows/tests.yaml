@@ -11,19 +11,19 @@ on:
 jobs:
   call-inclusive-naming-check:
     name: Inclusive naming
-    uses: canonical/inclusive-naming/.github/workflows/woke.yaml@main
+    uses: canonical/inclusive-naming/.github/workflows/woke.yaml@7aa0f7a606f182bd03a7adb28e0d710216101ca5 # main
     with:
       fail-on-error: "true"
 
   validate-wheelhouse:
     name: Validate Wheelhouse
-    uses: charmed-kubernetes/workflows/.github/workflows/validate-wheelhouse.yaml@main
+    uses: charmed-kubernetes/workflows/.github/workflows/validate-wheelhouse.yaml@6ee58c37d404effad4598ce7b523dbaf0cb99285 # main
     with:
       python: "['3.10', '3.12']"
 
   lint-unit:
     name: Lint Unit
-    uses: charmed-kubernetes/workflows/.github/workflows/lint-unit.yaml@main
+    uses: charmed-kubernetes/workflows/.github/workflows/lint-unit.yaml@6ee58c37d404effad4598ce7b523dbaf0cb99285 # main
     with:
       python: "['3.10', '3.12']"
 
@@ -34,11 +34,11 @@ jobs:
       - lint-unit
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build Resources
         run:  sudo ./build-flannel-resources.sh
       - name: Upload resource artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: flannel-resources
           path: ./flannel*.tar.gz
@@ -53,10 +53,10 @@ jobs:
       - validate-wheelhouse
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
         with:
           python-version: '3.10'
 
@@ -65,7 +65,7 @@ jobs:
         run: echo "channel=$(cat .charmcraft-channel)" >> $GITHUB_OUTPUT
 
       - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
+        uses: charmed-kubernetes/actions-operator@ea90ed489690bf3b1c1fcca6ac5f9edab70aecb0 # main
         with:
           provider: lxd
           juju-channel: 3/stable
@@ -73,7 +73,7 @@ jobs:
           bootstrap-constraints: "arch=amd64 cores=2 mem=4G"
 
       - name: Download resource artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: flannel-resources
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload debug artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-run-artifacts
           path: tmp
