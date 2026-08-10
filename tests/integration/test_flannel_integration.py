@@ -42,7 +42,7 @@ async def _create_test_pod(model):
         "spec": {
             "containers": [
                 {
-                    "image": "rocks.canonical.com/cdk/busybox:1.32",
+                    "image": "ghcr.io/canonical/cdk/busybox:1.32",
                     "name": "test",
                     "args": ["echo", '"test"'],
                 }
