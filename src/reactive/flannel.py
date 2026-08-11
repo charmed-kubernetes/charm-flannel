@@ -19,7 +19,6 @@ from charms.reactive.helpers import data_changed
 
 from charms.layer import status
 
-
 ETCD_PATH = "/etc/ssl/flannel"
 ETCD_KEY_PATH = os.path.join(ETCD_PATH, "client-key.pem")
 ETCD_CERT_PATH = os.path.join(ETCD_PATH, "client-cert.pem")
